@@ -1,99 +1,89 @@
 require 'gtk3'
 require 'roo'
+require 'odf-report'
 require 'docx'
+require 'yaml'
 
-class ExcelToWordConverter
+CONFIG_FILE = "config.yml"
+
+def load_config
+  return {} unless File.exist?(CONFIG_FILE)
+  YAML.load_file(CONFIG_FILE)
+end
+
+def save_config(config)
+  File.write(CONFIG_FILE, config.to_yaml)
+end
+
+class ExcelToDocumentConverter
   def initialize
+    @config = load_config
     @builder = Gtk::Builder.new
-    @builder.add_from_string(interface)
+    @builder.add_from_file("ui/interface.glade")  # Загружаем интерфейс из файла
     @window = @builder.get_object("main_window")
-    
+
     @excel_entry = @builder.get_object("excel_entry")
-    @word_entry = @builder.get_object("word_entry")
-    
+    @template_entry = @builder.get_object("template_entry")
+    @format_combo = @builder.get_object("format_combo")
+
+    @template_entry.text = @config["template"] if @config["template"]
+
     @builder.get_object("excel_button").signal_connect("clicked") { select_file(@excel_entry) }
-    @builder.get_object("word_button").signal_connect("clicked") { select_file(@word_entry) }
+    @builder.get_object("template_button").signal_connect("clicked") { select_file(@template_entry, save: true) }
     @builder.get_object("convert_button").signal_connect("clicked") { convert }
-    
+
     @window.signal_connect("destroy") { Gtk.main_quit }
   end
 
-  def select_file(entry)
+
+  def select_file(entry, save: false)
     dialog = Gtk::FileChooserDialog.new(title: "Выберите файл", parent: @window, action: Gtk::FileChooserAction::OPEN)
     dialog.add_buttons(["Открыть", Gtk::ResponseType::ACCEPT], ["Отмена", Gtk::ResponseType::CANCEL])
     
     if dialog.run == Gtk::ResponseType::ACCEPT
       entry.text = dialog.filename
+      @config["template"] = dialog.filename if save
+      save_config(@config)
     end
     dialog.destroy
   end
 
   def convert
     excel_file = @excel_entry.text
-    word_file = @word_entry.text
-    return unless File.exist?(excel_file) && File.exist?(word_file)
+    template_file = @template_entry.text
+    format = @format_combo.active_text.downcase
+    return unless File.exist?(excel_file) && File.exist?(template_file)
     
-    convert_excel_to_word(excel_file, word_file)
+    if format == "odt"
+      convert_excel_to_odt(excel_file, template_file)
+    else
+      convert_excel_to_docx(excel_file, template_file)
+    end
   end
 
-  def convert_excel_to_word(excel_file, word_file)
+  def convert_excel_to_odt(excel_file, template_file)
     xlsx = Roo::Spreadsheet.open(excel_file)
-    doc = Docx::Document.open(word_file)
-    
-    table_data = []
-    (1..xlsx.last_row).each do |row_num|
-      row_data = (1..xlsx.last_column).map { |col_num| xlsx.cell(row_num, col_num).to_s }
-      table_data << row_data
+    report = ODFReport::Report.new(template_file) do |r|
+      r.add_table("TABLE", (1..xlsx.last_row).map { |row_num|
+        (1..xlsx.last_column).map { |col_num| xlsx.cell(row_num, col_num).to_s }
+      })
     end
-    
-    doc.paragraphs << "\n"
-    table = doc.add_table(table_data.size, table_data[0].size)
-    
-    table_data.each_with_index do |row, i|
-      row.each_with_index do |cell, j|
-        table[i][j].text = cell
-      end
-    end
-    
-    doc.save(word_file)
-    puts "Конвертация завершена!"
+    report.generate("converted.odt")
+    puts "Конвертация завершена! Файл сохранен как converted.odt"
   end
 
-  def interface
-    <<-UI
-      <interface>
-        <object class='GtkWindow' id='main_window'>
-          <property name='title'>Excel to Word Converter</property>
-          <child>
-            <object class='GtkBox'>
-              <property name='orientation'>vertical</property>
-              <child>
-                <object class='GtkEntry' id='excel_entry'/>
-              </child>
-              <child>
-                <object class='GtkButton' id='excel_button'>
-                  <property name='label'>Обзор</property>
-                </object>
-              </child>
-              <child>
-                <object class='GtkEntry' id='word_entry'/>
-              </child>
-              <child>
-                <object class='GtkButton' id='word_button'>
-                  <property name='label'>Обзор</property>
-                </object>
-              </child>
-              <child>
-                <object class='GtkButton' id='convert_button'>
-                  <property name='label'>Конвертировать</property>
-                </object>
-              </child>
-            </object>
-          </child>
-        </object>
-      </interface>
-    UI
+  def convert_excel_to_docx(excel_file, template_file)
+    doc = Docx::Document.open(template_file)
+    xlsx = Roo::Spreadsheet.open(excel_file)
+    
+    xlsx.each_row_streaming do |row|
+      doc.paragraphs << row.map(&:value).join("\t")
+    end
+    
+    doc.save("converted.docx")
+    puts "Конвертация завершена! Файл сохранен как converted.docx"
   end
+
 
   def run
     @window.show_all
@@ -101,5 +91,5 @@ class ExcelToWordConverter
   end
 end
 
-app = ExcelToWordConverter.new
+app = ExcelToDocumentConverter.new
 app.run

@@ -1,0 +1,39 @@
+<interface>
+        <object class='GtkWindow' id='main_window'>
+          <property name='title'>Excel to Document Converter</property>
+          <child>
+            <object class='GtkBox'>
+              <property name='orientation'>vertical</property>
+              <child>
+                <object class='GtkEntry' id='excel_entry'/>
+              </child>
+              <child>
+                <object class='GtkButton' id='excel_button'>
+                  <property name='label'>Обзор (Excel)</property>
+                </object>
+              </child>
+              <child>
+                <object class='GtkEntry' id='template_entry'/>
+              </child>
+              <child>
+                <object class='GtkButton' id='template_button'>
+                  <property name='label'>Обзор (Шаблон)</property>
+                </object>
+              </child>
+              <child>
+                <object class='GtkComboBoxText' id='format_combo'>
+                  <items>
+                    <item translatable='yes'>DOCX</item>
+                    <item translatable='yes'>ODT</item>
+                  </items>
+                </object>
+              </child>
+              <child>
+                <object class='GtkButton' id='convert_button'>
+                  <property name='label'>Конвертировать</property>
+                </object>
+              </child>
+            </object>
+          </child>
+        </object>
+      </interface>

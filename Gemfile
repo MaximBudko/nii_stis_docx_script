@@ -8,4 +8,4 @@ gem 'gtk3'
 gem 'roo'
 gem 'rubyXL'
 gem 'docx'
-
+gem 'odf-report'

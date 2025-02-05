@@ -33,7 +33,12 @@ GEM
       atk (= 4.2.7)
       gdk3 (= 4.2.7)
     json (2.9.1)
+    logger (1.6.5)
     matrix (0.4.2)
+    mime-types (3.6.0)
+      logger
+      mime-types-data (~> 3.2015)
+    mime-types-data (3.2025.0204)
     native-package-installer (1.1.9)
     nokogiri (1.18.2-aarch64-linux-gnu)
       racc (~> 1.4)
@@ -51,6 +56,10 @@ GEM
       racc (~> 1.4)
     nokogiri (1.18.2-x86_64-linux-musl)
       racc (~> 1.4)
+    odf-report (0.8.1)
+      mime-types
+      nokogiri (>= 1.12.0)
+      rubyzip (>= 1.3.0)
     pango (4.2.7)
       cairo-gobject (= 4.2.7)
       gobject-introspection (= 4.2.7)
@@ -94,6 +103,7 @@ PLATFORMS
 DEPENDENCIES
   docx
   gtk3
+  odf-report
   rake
   roo
   rspec
