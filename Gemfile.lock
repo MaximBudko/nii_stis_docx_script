@@ -10,10 +10,16 @@ GEM
     cairo-gobject (4.2.7)
       cairo (>= 1.16.2)
       glib2 (= 4.2.7)
+    caracal (1.4.1)
+      nokogiri (~> 1.6)
+      rubyzip (~> 1.1)
+      tilt (>= 1.4)
     diff-lcs (1.5.1)
-    docx (0.8.0)
-      nokogiri (~> 1.13, >= 1.13.0)
-      rubyzip (~> 2.0)
+    docx (0.3.0)
+      nokogiri (~> 1.8, >= 1.8.1)
+      rubyzip (~> 1.2, >= 1.2.1)
+    docx_generator (0.1.1)
+      rubyzip (>= 1)
     fiddle (1.1.6)
     gdk3 (4.2.7)
       cairo-gobject (= 4.2.7)
@@ -88,7 +94,12 @@ GEM
     rubyXL (3.4.33)
       nokogiri (>= 1.10.8)
       rubyzip (>= 1.3.0)
-    rubyzip (2.4.1)
+    rubyzip (1.3.0)
+    securerandom (0.4.1)
+    simple_xlsx_reader (5.0.0)
+      nokogiri
+      rubyzip
+    tilt (2.6.0)
 
 PLATFORMS
   aarch64-linux-gnu
@@ -101,13 +112,17 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
+  caracal
   docx
+  docx_generator
   gtk3
   odf-report
   rake
   roo
   rspec
   rubyXL
+  securerandom
+  simple_xlsx_reader
 
 BUNDLED WITH
    2.6.3
