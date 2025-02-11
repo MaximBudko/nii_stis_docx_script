@@ -8,23 +8,28 @@ def excel_to_docx(excel_file)
     return
   end
 
-  xlsx = Roo::Excelx.new(excel_file)
-  docx_file = "output_#{SecureRandom.hex(4)}.docx"  # Генерация имени файла
+  doc_name = 'Output.docx'
+  workbook = Roo::Spreadsheet.open(excel_file)
+  sheet = workbook.sheet(0)
 
-  Caracal::Document.save(docx_file) do |docx|
-    headers = xlsx.row(1)
-
-    docx.table [[headers] + xlsx.each_row_streaming(drop: 1).map {|row| row.map {|cell| cell&.value.to_s}}] do
-
-      border_color '000000'
-      border_size 8
-      width 5000
+  Caracal::Document.save(doc_name) do |doc|
+    doc.table do |t|
+      sheet.each_row_streaming do |row|
+        t.row do |r|
+          [row[0], row[4], row[5], row[6]].each do |cell|
+            r.cell do |c|
+              c.text cell.value.to_s
+            end
+          end
+        end
+      end
     end
-    
   end
 
-  puts "Файл #{docx_file} успешно создан!"
+
+  puts "Файл успешно создан!"
 end
+
 
 # Запуск функции с передачей файла Excel
 excel_to_docx('Test.xlsx')
