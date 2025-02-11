@@ -12,10 +12,13 @@ def excel_to_docx(excel_file)
   docx_file = "output_#{SecureRandom.hex(4)}.docx"  # Генерация имени файла
 
   Caracal::Document.save(docx_file) do |docx|
-    
-    xlsx.each_row_streaming do |row|
-      text = row.map { |cell| cell&.value.to_s }.join(' | ')  # Форматируем строку
-      docx.p(text) unless text.strip.empty?  # Добавляем строку как параграф в документ
+    headers = xlsx.row(1)
+
+    docx.table [[headers] + xlsx.each_row_streaming(drop: 1).map {|row| row.map {|cell| cell&.value.to_s}}] do
+
+      border_color '000000'
+      border_size 8
+      width 5000
     end
     
   end
