@@ -12,6 +12,16 @@ UNIT_MAP = {
   'p' => 'пФ'
 }
 
+# Словарь соответствий типов компонентов
+CATEGORY_MAP = {
+  'C' => 'Конденсаторы',
+  'R' => 'Резисторы',
+  'L' => 'Катушки индуктивности',
+  'D' => 'Диоды',
+  'Q' => 'Транзисторы',
+  'U' => 'Микросхемы'
+}
+
 # Пути к файлам
 docx_path = "shablon_pr.docx"
 new_docx_path = "shablon_pr_updated.docx"
@@ -68,9 +78,11 @@ data = []
 last_value = nil
 count = 1
 current_numbers = []
+last_category = nil  # Переменная для хранения последней категории
 
-sheet.each do |row|
-  next if row.nil?
+# Пропускаем первую строку с заголовками
+sheet.each_with_index do |row, index|
+  next if index == 0  # Пропускаем первую строку (заголовки)
 
   current_value = row[1]&.value.to_s.strip # 2-я колонка
   current_number = row[0]&.value.to_s.strip # 1-я колонка
@@ -79,6 +91,20 @@ sheet.each do |row|
 
   description = "#{row[4]&.value.to_s.strip} #{row[5]&.value.to_s.strip}"
   characteristics = parse_characteristics(row[2]&.value.to_s.strip, row[6]&.value.to_s.strip)
+
+  # Определяем тип компонента
+  component_type = current_number[0]  # Первая буква в номере компонента
+
+  # Если тип компонента новый (или отличается от предыдущего), вставляем строку-заголовок
+  if component_type != last_category && CATEGORY_MAP.key?(component_type)
+    category_name = CATEGORY_MAP[component_type]
+    data << [
+      "",            # Пустая ячейка
+      category_name, # Название категории
+      "",            # Пустая ячейка
+      ""             # Пустая ячейка
+    ]
+  end
 
   if current_value == last_value
     count += 1
@@ -97,6 +123,7 @@ sheet.each do |row|
   end
 
   last_value = current_value
+  last_category = component_type  # Обновляем текущую категорию
 end
 
 data.last[0] = format_numbers(current_numbers) unless current_numbers.empty?
@@ -124,25 +151,93 @@ Zip::File.open(new_docx_path) do |zip|
 
       data.each do |row_data|
         new_row = Nokogiri::XML::Node.new("w:tr", doc) # Создаем строку
-
-        row_data.each do |value|
+      
+        # Устанавливаем высоту строки 0,8 см
+        row_properties = Nokogiri::XML::Node.new("w:trPr", doc)
+        row_height = Nokogiri::XML::Node.new("w:trHeight", doc)
+        row_height['w:val'] = "453"  # 0.8 см (800 twips)
+        row_height['w:hRule'] = "exact" # Фиксированная высота
+        row_properties.add_child(row_height)
+        new_row.add_child(row_properties)
+      
+        row_data.each_with_index do |value, index|
           cell = Nokogiri::XML::Node.new("w:tc", doc) # Создаем ячейку
+          cell_properties = Nokogiri::XML::Node.new("w:tcPr", doc) # Свойства ячейки
+      
+          # Устанавливаем границы
+          borders = Nokogiri::XML::Node.new("w:tcBorders", doc)
+      
+          # Верхняя и нижняя граница для всех ячеек
+          top_border = Nokogiri::XML::Node.new("w:top", doc)
+          top_border['w:val'] = "single"
+          top_border['w:space'] = "0"
+          top_border['w:size'] = "4"  # Толщина линии
+          top_border['w:space'] = "0"
+      
+          bottom_border = Nokogiri::XML::Node.new("w:bottom", doc)
+          bottom_border['w:val'] = "single"
+          bottom_border['w:space'] = "0"
+          bottom_border['w:size'] = "4"
+      
+          borders.add_child(top_border)
+          borders.add_child(bottom_border)
+      
+          # Для первой и четвертой колонки добавляем левую и правую границу
+          if index == 0 || index == 3
+            left_border = Nokogiri::XML::Node.new("w:left", doc)
+            left_border['w:val'] = "single"
+            left_border['w:space'] = "0"
+            left_border['w:size'] = "4"
+      
+            right_border = Nokogiri::XML::Node.new("w:right", doc)
+            right_border['w:val'] = "single"
+            right_border['w:space'] = "0"
+            right_border['w:size'] = "4"
+      
+            borders.add_child(left_border)
+            borders.add_child(right_border)
+          end
+      
+          # Добавляем границы к ячейке
+          cell_properties.add_child(borders)
+          cell.add_child(cell_properties)
+      
+          # Добавляем содержимое ячейки
           paragraph = Nokogiri::XML::Node.new("w:p", doc) # Создаем параграф
           run = Nokogiri::XML::Node.new("w:r", doc) # Создаем run (контейнер для текста)
           text_node = Nokogiri::XML::Node.new("w:t", doc) # Создаем текстовый узел
-
-          text_node.content = value.empty? ? "[ПУСТО]" : value
+      
+          text_node.content = value.empty? ? "" : value
+      
+          # Применение стиля шрифта GOST type A, размер 14, курсив
+          run_properties = Nokogiri::XML::Node.new("w:rPr", doc)
+          font = Nokogiri::XML::Node.new("w:rFonts", doc)
+          font['w:ascii'] = "GOST Type A"
+          font['w:hAnsi'] = "GOST Type A"
+          font['w:eastAsia'] = "GOST Type A"
+          font['w:cs'] = "GOST Type A"
+          run_properties.add_child(font)
+      
+          size = Nokogiri::XML::Node.new("w:sz", doc)
+          size['w:val'] = "28"  # Устанавливаем размер шрифта 14 (в половинных пунктах)
+          run_properties.add_child(size)
+      
+          italic = Nokogiri::XML::Node.new("w:i", doc) # Курсив
+          run_properties.add_child(italic)
+      
+          run.add_child(run_properties)
           run.add_child(text_node)
           paragraph.add_child(run)
           cell.add_child(paragraph)
+      
           new_row.add_child(cell)
         end
-
+      
         puts "✅ Добавлена строка: #{row_data.inspect}" # Лог добавления строки
         table.add_child(new_row) # Вставляем строку в таблицу
       end
+            
     end
-
     # Сохраняем измененный XML для отладки
     File.write("after_edit.xml", doc.to_xml)
 

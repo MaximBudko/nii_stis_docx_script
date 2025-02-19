@@ -1,3 +1,4 @@
+не то давай еще раз 
 require 'rubyXL'
 require 'zip'
 require 'nokogiri'
@@ -10,16 +11,6 @@ UNIT_MAP = {
   'm' => 'МОм',
   'k' => 'кОм',
   'p' => 'пФ'
-}
-
-# Словарь соответствий типов компонентов
-CATEGORY_MAP = {
-  'C' => 'Конденсаторы',
-  'R' => 'Резисторы',
-  'L' => 'Катушки индуктивности',
-  'D' => 'Диоды',
-  'Q' => 'Транзисторы',
-  'U' => 'Микросхемы'
 }
 
 # Пути к файлам
@@ -78,7 +69,6 @@ data = []
 last_value = nil
 count = 1
 current_numbers = []
-last_category = nil  # Переменная для хранения последней категории
 
 # Пропускаем первую строку с заголовками
 sheet.each_with_index do |row, index|
@@ -91,20 +81,6 @@ sheet.each_with_index do |row, index|
 
   description = "#{row[4]&.value.to_s.strip} #{row[5]&.value.to_s.strip}"
   characteristics = parse_characteristics(row[2]&.value.to_s.strip, row[6]&.value.to_s.strip)
-
-  # Определяем тип компонента
-  component_type = current_number[0]  # Первая буква в номере компонента
-
-  # Если тип компонента новый (или отличается от предыдущего), вставляем строку-заголовок
-  if component_type != last_category && CATEGORY_MAP.key?(component_type)
-    category_name = CATEGORY_MAP[component_type]
-    data << [
-      "",            # Пустая ячейка
-      category_name, # Название категории
-      "",            # Пустая ячейка
-      ""             # Пустая ячейка
-    ]
-  end
 
   if current_value == last_value
     count += 1
@@ -123,7 +99,6 @@ sheet.each_with_index do |row, index|
   end
 
   last_value = current_value
-  last_category = component_type  # Обновляем текущую категорию
 end
 
 data.last[0] = format_numbers(current_numbers) unless current_numbers.empty?
@@ -207,7 +182,7 @@ Zip::File.open(new_docx_path) do |zip|
           run = Nokogiri::XML::Node.new("w:r", doc) # Создаем run (контейнер для текста)
           text_node = Nokogiri::XML::Node.new("w:t", doc) # Создаем текстовый узел
       
-          text_node.content = value.empty? ? "" : value
+          text_node.content = value.empty? ? "[ПУСТО]" : value
       
           # Применение стиля шрифта GOST type A, размер 14, курсив
           run_properties = Nokogiri::XML::Node.new("w:rPr", doc)
@@ -247,3 +222,33 @@ Zip::File.open(new_docx_path) do |zip|
 end
 
 puts "✅ Данные успешно добавлены в shablon_pr_updated.docx"
+s
+В этот код с сохранением всех стилей нужно добавит такую логику 
+
+оздается словарь соответствий типов компонентов:
+CATEGORY_MAP = {
+  'C' => 'Конденсаторы',
+  'R' => 'Резисторы',
+  'L' => 'Катушки индуктивности',
+  'D' => 'Диоды',
+  'Q' => 'Транзисторы',
+  'U' => 'Микросхемы'
+}
+Он нужен, чтобы перед компонентами C1, R1 и т.д. вставлялись строки с заголовками.
+Перед обработкой каждой строки мы проверяем тип элемента по первой букве в первой колонке:
+component_type = row_data[0][0]
+Если это новый тип (и он есть в словаре), мы вставляем строку-заголовок перед первой записью такого типа.
+Вставляемая строка состоит из 4 ячеек:
+1 колонка – пустая
+2 колонка – название группы (Конденсаторы, Резисторы и т. д.)
+3 колонка – пустая
+4 колонка – пустая
+Строка имеет границы, как и остальные.
+Что получится в Word:
+№	Наименование	Кол-во	Характеристики
+Конденсаторы		
+C1	Керамический 10нФ	2	10 нФ ±5%
+C2	Керамический 100нФ	1	100 нФ ±10%
+Резисторы		
+R1	1 кОм	5	1 кОм ±1%
+R2	10 кОм	3	10 кОм ±5%
