@@ -145,79 +145,42 @@ Zip::File.open(new_docx_path) do |zip|
     xml_content = document_xml.get_input_stream.read
     doc = Nokogiri::XML(xml_content)
 
-    # Сохраняем исходный XML для отладки
     File.write("before_edit.xml", doc.to_xml)
 
-    # Ищем таблицы
     tables = doc.xpath("//w:tbl", "w" => "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
-
     puts "🔹 Найдено таблиц: #{tables.size}"
-    
+
     tables.each do |table|
-      last_row = table.xpath(".//w:tr").last # Последняя строка
       puts "🔹 Найдено строк в таблице: #{table.xpath('.//w:tr').size}"
 
       data.each do |row_data|
-        new_row = Nokogiri::XML::Node.new("w:tr", doc) # Создаем строку
-      
-        # Устанавливаем высоту строки 0,8 см
+        first_cell_value = row_data[0].to_s
+        should_insert_empty_row = first_cell_value.length > 7 && first_cell_value.match?(/^(\w+)([-,])(\w+)$/)
+        
+        empty_row_data = nil
+        if should_insert_empty_row
+          first_part, separator, second_part = first_cell_value.match(/^(\w+)([-,])(\w+)$/).captures
+          row_data[0] = first_part + separator
+          empty_row_data = [second_part, "", row_data[2], row_data[3]]
+        end
+        
+        new_row = Nokogiri::XML::Node.new("w:tr", doc)
         row_properties = Nokogiri::XML::Node.new("w:trPr", doc)
         row_height = Nokogiri::XML::Node.new("w:trHeight", doc)
-        row_height['w:val'] = "453"  # 0.8 см (800 twips)
-        row_height['w:hRule'] = "exact" # Фиксированная высота
+        row_height['w:val'] = "453"
+        row_height['w:hRule'] = "exact"
         row_properties.add_child(row_height)
         new_row.add_child(row_properties)
-      
+        
+        formatted_cells = []
         row_data.each_with_index do |value, index|
-          cell = Nokogiri::XML::Node.new("w:tc", doc) # Создаем ячейку
-          cell_properties = Nokogiri::XML::Node.new("w:tcPr", doc) # Свойства ячейки
-      
-          # Устанавливаем границы
-          borders = Nokogiri::XML::Node.new("w:tcBorders", doc)
-      
-          # Верхняя и нижняя граница для всех ячеек
-          top_border = Nokogiri::XML::Node.new("w:top", doc)
-          top_border['w:val'] = "single"
-          top_border['w:space'] = "0"
-          top_border['w:size'] = "4"  # Толщина линии
-          top_border['w:space'] = "0"
-      
-          bottom_border = Nokogiri::XML::Node.new("w:bottom", doc)
-          bottom_border['w:val'] = "single"
-          bottom_border['w:space'] = "0"
-          bottom_border['w:size'] = "4"
-      
-          borders.add_child(top_border)
-          borders.add_child(bottom_border)
-      
-          # Для первой и четвертой колонки добавляем левую и правую границу
-          if index == 0 || index == 3
-            left_border = Nokogiri::XML::Node.new("w:left", doc)
-            left_border['w:val'] = "single"
-            left_border['w:space'] = "0"
-            left_border['w:size'] = "4"
-      
-            right_border = Nokogiri::XML::Node.new("w:right", doc)
-            right_border['w:val'] = "single"
-            right_border['w:space'] = "0"
-            right_border['w:size'] = "4"
-      
-            borders.add_child(left_border)
-            borders.add_child(right_border)
-          end
-      
-          # Добавляем границы к ячейке
-          cell_properties.add_child(borders)
-          cell.add_child(cell_properties)
-      
-          # Добавляем содержимое ячейки
-          paragraph = Nokogiri::XML::Node.new("w:p", doc) # Создаем параграф
-          run = Nokogiri::XML::Node.new("w:r", doc) # Создаем run (контейнер для текста)
-          text_node = Nokogiri::XML::Node.new("w:t", doc) # Создаем текстовый узел
-      
-          text_node.content = value.empty? ? "" : value
-      
-          # Применение стиля шрифта GOST type A, размер 14, курсив
+          cell = Nokogiri::XML::Node.new("w:tc", doc)
+          cell_properties = Nokogiri::XML::Node.new("w:tcPr", doc)
+          paragraph = Nokogiri::XML::Node.new("w:p", doc)
+          run = Nokogiri::XML::Node.new("w:r", doc)
+          text_node = Nokogiri::XML::Node.new("w:t", doc)
+          text_node.content = value
+
           run_properties = Nokogiri::XML::Node.new("w:rPr", doc)
           font = Nokogiri::XML::Node.new("w:rFonts", doc)
           font['w:ascii'] = "GOST Type A"
@@ -225,33 +188,54 @@ Zip::File.open(new_docx_path) do |zip|
           font['w:eastAsia'] = "GOST Type A"
           font['w:cs'] = "GOST Type A"
           run_properties.add_child(font)
-      
+
           size = Nokogiri::XML::Node.new("w:sz", doc)
-          size['w:val'] = "28"  # Устанавливаем размер шрифта 14 (в половинных пунктах)
+          size['w:val'] = "28"
           run_properties.add_child(size)
-      
-          italic = Nokogiri::XML::Node.new("w:i", doc) # Курсив
+
+          italic = Nokogiri::XML::Node.new("w:i", doc)
           run_properties.add_child(italic)
-      
+
           run.add_child(run_properties)
           run.add_child(text_node)
           paragraph.add_child(run)
           cell.add_child(paragraph)
-      
+          cell.add_child(cell_properties)
           new_row.add_child(cell)
+          formatted_cells << cell
         end
-      
-        puts "✅ Добавлена строка: #{row_data.inspect}" # Лог добавления строки
-        table.add_child(new_row) # Вставляем строку в таблицу
-      end
-            
-    end
-    # Сохраняем измененный XML для отладки
-    File.write("after_edit.xml", doc.to_xml)
 
-    # Записываем изменения обратно в docx
+        table.add_child(new_row)
+        puts "✅ Добавлена строка: #{row_data.inspect}"
+
+        if should_insert_empty_row
+          empty_row = Nokogiri::XML::Node.new("w:tr", doc)
+          empty_row.add_child(row_properties.dup)
+          empty_row_data.each_with_index do |value, index|
+            cell = formatted_cells[index].dup
+            cell.xpath(".//w:t").first.content = value
+            empty_row.add_child(cell)
+          end
+          table.add_child(empty_row)
+          puts "➕ Вставлена строка с перемещением значений: #{empty_row_data.inspect}"
+
+          # Очищаем 3 и 4 колонку в строке, которая была до вставки пустой строки
+          previous_row = table.xpath(".//w:tr")[table.xpath(".//w:tr").size - 2]  # Берем строку перед добавленной пустой строкой
+          previous_row.xpath('.//w:tc')[2].xpath(".//w:t").first.content = ""
+          previous_row.xpath('.//w:tc')[3].xpath(".//w:t").first.content = ""
+
+          row_data[2] = ""
+          row_data[3] = ""
+        end
+      end
+    end
+
+    File.write("after_edit.xml", doc.to_xml)
     zip.get_output_stream("word/document.xml") { |f| f.write(doc.to_xml) }
   end
 end
+
+
+
 
 puts "✅ Данные успешно добавлены в shablon_pr_updated.docx"
