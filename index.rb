@@ -184,9 +184,16 @@ def group_by_category(data)
   result
 end
 
+def move_first_to_end(arr)
+  arr.push(arr.shift)
+end
+
 data1 = group_by_category(data)
 data2 = process_array(data1)
-data3 = insert_empty_rows(data2)
+data3 = move_first_to_end(data2)
+data4 = insert_empty_rows(data3)
+
+
 
 
 
@@ -206,7 +213,7 @@ Zip::File.open(new_docx_path) do |zip|
     tables.each do |table|
       puts "🔹 Найдено строк в таблице: #{table.xpath('.//w:tr').size}"
 
-      data3.each do |row_data|  
+      data4.each do |row_data|  
         new_row = Nokogiri::XML::Node.new("w:tr", doc)
         row_properties = Nokogiri::XML::Node.new("w:trPr", doc)
         row_height = Nokogiri::XML::Node.new("w:trHeight", doc)
