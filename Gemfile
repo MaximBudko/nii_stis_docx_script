@@ -17,3 +17,4 @@ gem 'fileutils'
 gem 'zip'
 gem 'fileutils'
 gem 'docx_manipulator'
+gem "pp"

@@ -2,6 +2,7 @@ require 'rubyXL'
 require 'zip'
 require 'nokogiri'
 require 'fileutils'
+require 'pp'
 
 # Словарь замен единиц измерения
 UNIT_MAP = {
@@ -21,7 +22,7 @@ CATEGORY_MAP = {
   'F' => 'Предохранители',
   'HL' => 'Индикаторы',
   'K' => 'Реле',
-  'L' => 'Дросили',
+  'L' => 'Дросcли',
   'R' => 'Резисторы',
   'SB' => 'Кнопки тактовые',
   'U' => 'Модули',
@@ -82,6 +83,7 @@ xlsx = RubyXL::Parser.parse(xlsx_path)
 sheet = xlsx[0] # Берем первый лист
 
 # Читаем и обрабатываем данные из Excel
+# Читаем и обрабатываем данные из Excel
 data = []
 last_value = nil
 count = 1
@@ -100,20 +102,10 @@ sheet.each_with_index do |row, index|
   description = "#{row[4]&.value.to_s.strip} #{row[5]&.value.to_s.strip}"
   characteristics = parse_characteristics(row[2]&.value.to_s.strip, row[6]&.value.to_s.strip)
 
-  # Определяем тип компонента
-  component_type = current_number[0]  # Первая буква в номере компонента
+  # Определяем тип компонента по первым символам номера
+  component_type = CATEGORY_MAP.keys.find { |key| current_number.start_with?(key) }  # Поиск совпадения по начальной части строки
 
-  # Если тип компонента новый (или отличается от предыдущего), вставляем строку-заголовок
-  if component_type != last_category && CATEGORY_MAP.key?(component_type)
-    category_name = CATEGORY_MAP[component_type]
-    data << [
-      "",            # Пустая ячейка
-      category_name, # Название категории
-      "",            # Пустая ячейка
-      ""             # Пустая ячейка
-    ]
-  end
-
+  # Если значение то же, добавляем к текущим данным
   if current_value == last_value
     count += 1
     current_numbers << current_number
@@ -131,12 +123,73 @@ sheet.each_with_index do |row, index|
   end
 
   last_value = current_value
-  last_category = component_type  # Обновляем текущую категорию
 end
 
 data.last[0] = format_numbers(current_numbers) unless current_numbers.empty?
 
-# Работа с Word
+def insert_empty_rows(data)
+  empty_row = ["", "", "", ""]
+  index = 24 # так как индексация с 0, 24-й элемент имеет индекс 23
+  
+  while index < data.length
+    data.insert(index, empty_row.dup) # вставляем копию пустого массива
+    index += 30 # сдвигаем индекс на 29 позиций (учитывая вставленный элемент)
+  end
+  
+  data
+end
+
+
+#data.each { |sub_array| puts sub_array.inspect }
+
+def process_array(data)
+  processed_data = []
+
+  data.each do |row|
+    if row[0].length > 7
+      parts = row[0].rpartition(/[-,]/) # Разделяем по последнему '-' или ','
+      if parts[1] != ""
+        processed_data << [parts[0] + parts[1], row[1], "", ""]
+        processed_data << [parts[2], "", row[2], row[3]]
+      else
+        processed_data << row # Если не удалось разделить, оставляем как есть
+      end
+    else
+      processed_data << row
+    end
+  end
+
+  processed_data
+end
+
+def group_by_category(data)
+  grouped_data = Hash.new { |hash, key| hash[key] = [] }
+
+  # Группируем элементы по первой букве первого элемента (категория)
+  data.each do |row|
+    category_key = row[0][0..1] # Берем первые 1-2 символа (например, "R", "C", "DA")
+    category_key = CATEGORY_MAP.keys.include?(category_key) ? category_key : category_key[0] # Проверяем, если нет двухбуквенного кода, берем первую букву
+    category_name = CATEGORY_MAP[category_key] || 'Неизвестная категория'
+    grouped_data[category_name] << row
+  end
+
+  # Формируем новый массив с заголовками
+  result = []
+  grouped_data.each do |category, items|
+    result << ["", "", "", ""]
+    result << ["", category, "", ""]
+    result.concat(items)
+  end
+
+  result
+end
+
+data1 = group_by_category(data)
+data2 = process_array(data1)
+data3 = insert_empty_rows(data2)
+
+
+
 FileUtils.cp(docx_path, new_docx_path)
 Zip::File.open(new_docx_path) do |zip|
   document_xml = zip.find_entry("word/document.xml")
@@ -153,17 +206,7 @@ Zip::File.open(new_docx_path) do |zip|
     tables.each do |table|
       puts "🔹 Найдено строк в таблице: #{table.xpath('.//w:tr').size}"
 
-      data.each do |row_data|
-        first_cell_value = row_data[0].to_s
-        should_insert_empty_row = first_cell_value.length > 7 && first_cell_value.match?(/^(\w+)([-,])(\w+)$/)
-        
-        empty_row_data = nil
-        if should_insert_empty_row
-          first_part, separator, second_part = first_cell_value.match(/^(\w+)([-,])(\w+)$/).captures
-          row_data[0] = first_part + separator
-          empty_row_data = [second_part, "", row_data[2], row_data[3]]
-        end
-        
+      data3.each do |row_data|  
         new_row = Nokogiri::XML::Node.new("w:tr", doc)
         row_properties = Nokogiri::XML::Node.new("w:trPr", doc)
         row_height = Nokogiri::XML::Node.new("w:trHeight", doc)
@@ -207,26 +250,6 @@ Zip::File.open(new_docx_path) do |zip|
 
         table.add_child(new_row)
         puts "✅ Добавлена строка: #{row_data.inspect}"
-
-        if should_insert_empty_row
-          empty_row = Nokogiri::XML::Node.new("w:tr", doc)
-          empty_row.add_child(row_properties.dup)
-          empty_row_data.each_with_index do |value, index|
-            cell = formatted_cells[index].dup
-            cell.xpath(".//w:t").first.content = value
-            empty_row.add_child(cell)
-          end
-          table.add_child(empty_row)
-          puts "➕ Вставлена строка с перемещением значений: #{empty_row_data.inspect}"
-
-          # Очищаем 3 и 4 колонку в строке, которая была до вставки пустой строки
-          previous_row = table.xpath(".//w:tr")[table.xpath(".//w:tr").size - 2]  # Берем строку перед добавленной пустой строкой
-          previous_row.xpath('.//w:tc')[2].xpath(".//w:t").first.content = ""
-          previous_row.xpath('.//w:tc')[3].xpath(".//w:t").first.content = ""
-
-          row_data[2] = ""
-          row_data[3] = ""
-        end
       end
     end
 

@@ -78,6 +78,9 @@ GEM
       cairo-gobject (= 4.2.7)
       gobject-introspection (= 4.2.7)
     pkg-config (1.5.9)
+    pp (0.6.2)
+      prettyprint
+    prettyprint (0.2.0)
     racc (1.8.1)
     rake (13.2.1)
     red-colors (0.4.0)
@@ -128,6 +131,7 @@ DEPENDENCIES
   fileutils
   gtk3
   odf-report
+  pp
   rake
   roo
   rspec
