@@ -69,12 +69,12 @@ def format_numbers(numbers)
     if curr_num == prev_num + 1
       temp_range << curr
     else
-      ranges << (temp_range.size > 2 ? "#{temp_range.first}-#{temp_range.last}" : temp_range.join(","))
+      ranges << (temp_range.size > 2 ? "#{temp_range.first}-#{temp_range.last}" : temp_range.join(", "))
       temp_range = [curr]
     end
   end
 
-  ranges << (temp_range.size > 2 ? "#{temp_range.first}-#{temp_range.last}" : temp_range.join(",")) unless temp_range.empty?
+  ranges << (temp_range.size > 2 ? "#{temp_range.first}-#{temp_range.last}" : temp_range.join(", ")) unless temp_range.empty?
   ranges.join(", ")
 end
 
@@ -146,7 +146,7 @@ def process_array(data)
   processed_data = []
 
   data.each do |row|
-    if row[0].length > 7
+    if row[0].length > 8
       parts = row[0].rpartition(/[-,]/) # Разделяем по последнему '-' или ','
       if parts[1] != ""
         processed_data << [parts[0] + parts[1], row[1], "", ""]
