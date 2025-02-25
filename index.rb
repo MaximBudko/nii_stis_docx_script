@@ -127,21 +127,6 @@ end
 
 data.last[0] = format_numbers(current_numbers) unless current_numbers.empty?
 
-def insert_empty_rows(data)
-  empty_row = ["", "", "", ""]
-  index = 24 # так как индексация с 0, 24-й элемент имеет индекс 23
-  
-  while index < data.length
-    data.insert(index, empty_row.dup) # вставляем копию пустого массива
-    index += 30 # сдвигаем индекс на 29 позиций (учитывая вставленный элемент)
-  end
-  
-  data
-end
-
-
-#data.each { |sub_array| puts sub_array.inspect }
-
 def process_array(data)
   processed_data = []
 
@@ -188,12 +173,35 @@ def move_first_to_end(arr)
   arr.push(arr.shift)
 end
 
+
+def insert_empty_and_move(data)
+  empty_row = ["", "", "", ""]
+  index = 24 # так как индексация с 0, 24-й элемент имеет индекс 23
+  index_for_move = 23
+
+  while index < data.length
+    if data[index - 1][1] != "" && data[index - 1][2] == "" && data[index - 1][3] == ""
+      data.insert(index - 1, empty_row.dup)
+      data.insert(index, empty_row.dup)
+      p "Отработал в позиции #{index}"
+    else
+      data.insert(index, empty_row.dup) # вставляем копию пустого массива
+    end
+    index += 30 # сдвигаем индекс на 29 позиций (учиxтывая вставленный элемент)
+  end
+  
+  data
+end
+
 data1 = group_by_category(data)
+p 1
 data2 = process_array(data1)
+p 2
 data3 = move_first_to_end(data2)
-data4 = insert_empty_rows(data3)
-
-
+#pp data2
+p 3
+data5 = insert_empty_and_move(data3)
+p 4
 
 
 
@@ -211,9 +219,9 @@ Zip::File.open(new_docx_path) do |zip|
     puts "🔹 Найдено таблиц: #{tables.size}"
 
     tables.each do |table|
-      puts "🔹 Найдено строк в таблице: #{table.xpath('.//w:tr').size}"
+      #puts "🔹 Найдено строк в таблице: #{table.xpath('.//w:tr').size}"
 
-      data4.each do |row_data|  
+      data5.each do |row_data|  
         new_row = Nokogiri::XML::Node.new("w:tr", doc)
         row_properties = Nokogiri::XML::Node.new("w:trPr", doc)
         row_height = Nokogiri::XML::Node.new("w:trHeight", doc)
@@ -256,7 +264,7 @@ Zip::File.open(new_docx_path) do |zip|
         end
 
         table.add_child(new_row)
-        puts "✅ Добавлена строка: #{row_data.inspect}"
+        #puts "✅ Добавлена строка: #{row_data.inspect}"
       end
     end
 
@@ -268,4 +276,4 @@ end
 
 
 
-puts "✅ Данные успешно добавлены в shablon_pr_updated.docx"
+#puts "✅ Данные успешно добавлены в shablon_pr_updated.docx"
