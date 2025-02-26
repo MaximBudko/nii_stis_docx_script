@@ -10,21 +10,10 @@ GEM
     cairo-gobject (4.2.7)
       cairo (>= 1.16.2)
       glib2 (= 4.2.7)
-    caracal (1.4.1)
-      nokogiri (~> 1.6)
-      rubyzip (~> 1.1)
-      tilt (>= 1.4)
-    concurrent-ruby (1.3.5)
     diff-lcs (1.5.1)
     docx (0.3.0)
       nokogiri (~> 1.8, >= 1.8.1)
       rubyzip (~> 1.2, >= 1.2.1)
-    docx_generator (0.1.1)
-      rubyzip (>= 1)
-    docx_manipulator (0.0.8)
-      i18n
-      nokogiri
-      rubyzip
     fiddle (1.1.6)
     fileutils (1.7.3)
     gdk3 (4.2.7)
@@ -44,15 +33,8 @@ GEM
     gtk3 (4.2.7)
       atk (= 4.2.7)
       gdk3 (= 4.2.7)
-    i18n (1.14.7)
-      concurrent-ruby (~> 1.0)
     json (2.9.1)
-    logger (1.6.5)
     matrix (0.4.2)
-    mime-types (3.6.0)
-      logger
-      mime-types-data (~> 3.2015)
-    mime-types-data (3.2025.0204)
     native-package-installer (1.1.9)
     nokogiri (1.18.2-aarch64-linux-gnu)
       racc (~> 1.4)
@@ -70,10 +52,6 @@ GEM
       racc (~> 1.4)
     nokogiri (1.18.2-x86_64-linux-musl)
       racc (~> 1.4)
-    odf-report (0.8.1)
-      mime-types
-      nokogiri (>= 1.12.0)
-      rubyzip (>= 1.3.0)
     pango (4.2.7)
       cairo-gobject (= 4.2.7)
       gobject-introspection (= 4.2.7)
@@ -107,10 +85,7 @@ GEM
       rubyzip (>= 1.3.0)
     rubyzip (1.3.0)
     securerandom (0.4.1)
-    simple_xlsx_reader (5.0.0)
-      nokogiri
-      rubyzip
-    tilt (2.6.0)
+    stringio (3.1.5)
     zip (2.0.2)
 
 PLATFORMS
@@ -124,20 +99,17 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
-  caracal
   docx
-  docx_generator
-  docx_manipulator
   fileutils
   gtk3
-  odf-report
+  nokogiri
   pp
   rake
   roo
   rspec
   rubyXL
   securerandom
-  simple_xlsx_reader
+  stringio
   zip
 
 BUNDLED WITH
