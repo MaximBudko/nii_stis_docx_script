@@ -42,6 +42,7 @@ module ExcelToDocx
     number = value[/\d+(\.\d+)?/] # Извлекаем число
     dnp = value.include?("DNP") ? " DNP" : ""
 
+    return "" if UNIT_MAP[unit] == nil || UNIT_MAP.include?(unit) == false
     unit = UNIT_MAP[unit] || unit # Подставляем русское обозначение
 
     formatted_value = number ? "#{number} #{unit}" : value
@@ -77,7 +78,7 @@ module ExcelToDocx
     processed_data = []
 
     data.each do |row|
-      if row[0].length > 8
+      if row[0].scan(/\S/).length > 7
         parts = row[0].rpartition(/[-,]/) # Разделяем по последнему '-' или ','
         if parts[1] != ""
           processed_data << [parts[0] + parts[1], row[1], "", ""]
@@ -98,7 +99,7 @@ module ExcelToDocx
 
     # Группируем элементы по первой букве первого элемента (категория)
     data.each do |row|
-      category_key = row[0][0..1] # Берем первые 1-2 символа (например, "R", "C", "DA")
+      category_key = row[0][/\A[a-zA-Z]+/] # Берем первые 1-2 символа (например, "R", "C", "DA")
       category_key = CATEGORY_MAP.keys.include?(category_key) ? category_key : category_key[0] # Проверяем, если нет двухбуквенного кода, берем первую букву
       category_name = CATEGORY_MAP[category_key] || 'Неизвестная категория'
       grouped_data[category_name] << row
@@ -145,6 +146,7 @@ module ExcelToDocx
     values = field_values
     data = []
     last_value = nil
+    last_qnt = nil
     count = 1
     current_numbers = []
     last_category = nil 
@@ -154,7 +156,7 @@ module ExcelToDocx
 
       current_value = row[1]&.value.to_s.strip # 2-я колонка
       current_number = row[0]&.value.to_s.strip # 1-я колонка
-
+      current_qnt = row[2]&.value.to_s.strip # 3-я колонка
       next if current_value.empty?
 
       description = "#{row[4]&.value.to_s.strip} #{row[5]&.value.to_s.strip}"
@@ -164,7 +166,7 @@ module ExcelToDocx
       component_type = CATEGORY_MAP.keys.find { |key| current_number.start_with?(key) }  # Поиск совпадения по начальной части строки
 
       # Если значение то же, добавляем к текущим данным
-      if current_value == last_value
+      if current_value == last_value && current_qnt == last_qnt
         count += 1
         current_numbers << current_number
         data.last[2] = count.to_s
@@ -179,7 +181,7 @@ module ExcelToDocx
           characteristics # Характеристики
         ]
       end
-
+      last_qnt = current_qnt
       last_value = current_value
     end
 
@@ -200,7 +202,6 @@ module ExcelToDocx
         namespaces = { 'w' => 'http://schemas.openxmlformats.org/wordprocessingml/2006/main' }
 
         doc.xpath('//w:t', namespaces).each do |node|
-          puts node
           text = node.text.strip
           if text.empty?
             node.content = ""
@@ -238,6 +239,18 @@ module ExcelToDocx
             row_data.each_with_index do |value, index|
               cell = Nokogiri::XML::Node.new("w:tc", doc)
               cell_properties = Nokogiri::XML::Node.new("w:tcPr", doc)
+              
+
+              borders = Nokogiri::XML::Node.new("w:tcBorders", doc)
+              ["w:top", "w:bottom", "w:left", "w:right"].each do |side|
+                border = Nokogiri::XML::Node.new(side, doc)
+                border['w:val'] = "single"  # Сплошная линия
+                border['w:sz'] = "10"        # Толщина границы
+                border['w:color'] = "000000" # Черный цвет
+                borders.add_child(border)
+              end
+              cell_properties.add_child(borders)
+
               paragraph = Nokogiri::XML::Node.new("w:p", doc)
               run = Nokogiri::XML::Node.new("w:r", doc)
               text_node = Nokogiri::XML::Node.new("w:t", doc)
