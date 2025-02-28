@@ -3,8 +3,8 @@ require 'json'
 
 class FileChooserApp < Gtk::Window
   SETTINGS_FILE = "saves/settings.json"
-  FIELD_LABELS = ["Перв. примен.", "Разраб.", "Пров.", "Н. контр.", "Утв.", "Дец. номер", "Наименование устройства", "Наименование организации", "Литера"]
-  FIELD_LABELS_FOR_REMOVED = ["perv_primen", "razrab", "prover", "n_kontr", "utverd", "blpa", "device_name", "company_name", "litera"]
+  FIELD_LABELS = ["Перв. примен.", "Разраб.", "Пров.", "Н. контр.", "Утв.", "Дец. номер", "Наименование устройства", "Наименование организации", "Литера", "Знак литеры"]
+  FIELD_LABELS_FOR_REMOVED = ["perv_primen", "razrab", "prover", "n_kontr", "utverd", "blpa", "device_name", "company_name", "litera", "zn"]
  
  
   def initialize

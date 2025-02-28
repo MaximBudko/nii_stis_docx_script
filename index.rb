@@ -7,45 +7,108 @@ require 'stringio'
 
 module ExcelToDocx
   # Словарь замен единиц измерения
-  UNIT_MAP = {
-    'n' => 'нФ',
-    'u' => 'мкФ',
-    'm' => 'МОм',
-    'k' => 'кОм',
-    'p' => 'пФ'
+  UNIT_CATEGORY = {
+    "p" => "п",
+    "n" => "н",
+    "u" => "мк",
+    "m" => "м",
+    "k" => "к",
+    "M" => "М"
   }
 
   # Словарь соответствий типов компонентов
   CATEGORY_MAP = {
-    'G' => 'Генераторы',
-    'C' => 'Конденсаторы',
-    'D' => 'Микросхемы',
-    'DA' => 'Микросхемы аналоговые',
-    'F' => 'Предохранители',
-    'HL' => 'Индикаторы',
-    'K' => 'Реле',
-    'L' => 'Дроссели',
-    'R' => 'Резисторы',
-    'SB' => 'Кнопки тактовые',
-    'U' => 'Модули',
-    'VD' => 'Диоды',
-    'VT' => 'Транзисторы',
-    'X' => 'Соединители'
+    "C" => 	["Конденсатор", "Конденсаторы"],
+    "D" => 	["Микросхема", "Микросхемы"],
+    "DA" => ["Микросхема аналоговая",	"Микросхемы аналоговые"],
+    "E" =>	["Элемент", "Элементы"],
+    "F" =>	["Предохранитель", "Предохранители"],
+    "G" => 	["Генератор", "Генераторы"],
+    "GB" =>	["Батарея литиевая", "Батареи литиевые"],
+    "H" =>	["Индикатор", "Индикаторы"],
+    "X" => 	["Соединитель", "Соединители"],
+    "K" =>	["Реле", "Реле"],
+    "L" => 	["Дроссель", "Дроссели"],
+    "R" => 	["Резистор", "Резисторы"],
+    "S" =>	["Кнопка тактовая", "Кнопки тактовые"],
+    "T" => 	["Трансформатор", "Трансформаторы"],
+    "U" => 	["Модуль", "Модули"],
+    "VD" =>	["Диод", "Диоды"],
+    "VT" =>	["Транзистор", "Транзисторы"],
+    "P" =>	["Реле", "Реле"],
+    "FA" =>	["Предохранитель", "Предохранители"],
+    "Z" =>	["Кварцевый резонатор", "Кварцевые резонаторы"]
   }
 
-  def self.parse_characteristics(value, tolerance)
-    return "" if value.nil? || value.strip.empty?
-
+  def self.parse_characteristics(value, tolerance, current_number)
+    regxp_current_number = current_number[/\A[a-zA-Z]+/]
     value = value.gsub(",", ".") # Заменяем запятую на точку
+    unit_second = ""
+    if regxp_current_number == "C"
+      unit_second = "Ф"
+    elsif regxp_current_number == "D" 
+      unit_second = ""
+    elsif regxp_current_number == "DA"
+      unit_second = ""
+    elsif regxp_current_number == "E"
+      unit_second = ""
+    elsif regxp_current_number == "F"
+      unit_second = ""
+    elsif regxp_current_number == "G"
+      unit_second = ""
+    elsif regxp_current_number == "GB"
+      unit_second = ""
+    elsif regxp_current_number == "H"
+      unit_second = ""
+    elsif regxp_current_number == "X"
+      unit_second = ""
+    elsif regxp_current_number == "K"
+      unit_second = ""
+    elsif regxp_current_number == "L"
+      unit_second = "Гн"
+    elsif regxp_current_number == "R"
+      unit_second = "Ом"
+    elsif regxp_current_number == "S"
+      unit_second = ""
+    elsif regxp_current_number == "T"
+      unit_second = ""
+    elsif regxp_current_number == "U"
+      unit_second = ""
+    elsif regxp_current_number == "VD"
+      unit_second = ""
+    elsif regxp_current_number == "VT"
+      unit_second = ""
+    elsif regxp_current_number == "P"
+      unit_second = ""
+    elsif regxp_current_number == "FA"
+      unit_second = ""
+    elsif regxp_current_number == "Z"
+      unit_second = ""
+    end
 
-    unit = value[/[a-zA-Z]+/] # Извлекаем единицу измерения
+    unit_first = value[/[a-zA-Z]+/] # Извлекаем единицу измерения
     number = value[/\d+(\.\d+)?/] # Извлекаем число
     dnp = value.include?("DNP") ? " DNP" : ""
 
-    return "" if UNIT_MAP[unit] == nil || UNIT_MAP.include?(unit) == false
-    unit = UNIT_MAP[unit] || unit # Подставляем русское обозначение
+    unit = UNIT_CATEGORY[unit_first] || ""
+    if regxp_current_number == "DA" || regxp_current_number == "F" || regxp_current_number == "D" ||
+      regxp_current_number == "G" || regxp_current_number == "K" || regxp_current_number == "HL" ||
+      regxp_current_number == "SB" || regxp_current_number == "U" || regxp_current_number == "VD"||
+      regxp_current_number == "VT" || regxp_current_number == "X"
 
-    formatted_value = number ? "#{number} #{unit}" : value
+      return "#{value.include?("DNP") ? " DNP" : ""}"
+    end
+    if UNIT_CATEGORY.include?(unit_first) == false
+      if value.match?(/^[\d[:punct:]\s]+$/) == true || value.match?(/^[\d[:punct:]\s]+_DNP$/) == true 
+        formatted_value = "#{number == " " ? "0" : number } #{unit}#{unit_second}"
+        formatted_value += "±#{tolerance}" unless tolerance.nil? || tolerance.empty?
+        return formatted_value.gsub(".", ",") + dnp
+      else
+        return "#{value.include?("DNP") ? " DNP" : ""}"
+      end
+    end
+
+    formatted_value = "#{number == " " ? "0" : number } #{unit}#{unit_second}"
     formatted_value += "±#{tolerance}" unless tolerance.nil? || tolerance.empty?
 
     formatted_value.gsub(".", ",") + dnp
@@ -104,12 +167,14 @@ module ExcelToDocx
       category_name = CATEGORY_MAP[category_key] || 'Неизвестная категория'
       grouped_data[category_name] << row
     end
-
     # Формируем новый массив с заголовками
     result = []
     grouped_data.each do |category, items|
-      result << ["", "", "", ""]
-      result << ["", category, "", ""]
+      selected_key = items.size > 1 ? category[1] : category[0] 
+      unless result.last == ["", "", "", ""]
+        result << ["", "", "", ""]
+      end
+      result << ["", selected_key, "", ""]
       result.concat(items)
     end
 
@@ -126,7 +191,10 @@ module ExcelToDocx
     index_for_move = 23
 
     while index < data.length
-      if data[index - 1][1] != "" && data[index - 1][2] == "" && data[index - 1][3] == ""
+
+      if data[index] == empty_row
+
+      elsif data[index - 1][1] != "" && data[index - 1][2] == "" && data[index - 1][3] == ""
         data.insert(index - 1, empty_row.dup)
         data.insert(index, empty_row.dup)
       else
@@ -160,7 +228,7 @@ module ExcelToDocx
       next if current_value.empty?
 
       description = "#{row[4]&.value.to_s.strip} #{row[5]&.value.to_s.strip}"
-      characteristics = parse_characteristics(row[2]&.value.to_s.strip, row[6]&.value.to_s.strip)
+      characteristics = parse_characteristics(row[2]&.value.to_s.strip, row[6]&.value.to_s.strip, current_number)
 
       # Определяем тип компонента по первым символам номера
       component_type = CATEGORY_MAP.keys.find { |key| current_number.start_with?(key) }  # Поиск совпадения по начальной части строки
@@ -251,7 +319,13 @@ module ExcelToDocx
               end
               cell_properties.add_child(borders)
 
+              v_align = Nokogiri::XML::Node.new("w:vAlign", doc)
+              v_align['w:val'] = 'center'  
+              cell_properties.add_child(v_align)
+
               paragraph = Nokogiri::XML::Node.new("w:p", doc)
+              paragraph_properties = Nokogiri::XML::Node.new("w:pPr", doc)
+              paragraph.add_child(paragraph_properties)
               run = Nokogiri::XML::Node.new("w:r", doc)
               text_node = Nokogiri::XML::Node.new("w:t", doc)
               text_node.content = value
