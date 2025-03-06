@@ -1,0 +1,164 @@
+require 'fox16'
+require 'json'
+include Fox
+
+class FileChooserApp < FXMainWindow
+  SETTINGS_FILE = "saves/settings.json"
+  FIELD_LABELS = ["Перв. примен.", "Разраб.", "Пров.", "Н. контр.", "Утв.", "Дец. номер", "Наименование устройства", "Наименование организации"]
+  FIELD_LABELS_FOR_REMOVED = ["perv_primen", "razrab", "prover", "n_kontr", "utverd", "blpa", "device_name", "company_name"]
+  
+  def initialize(app)
+    super(app, "Приложение", width: 600, height: 500)
+    
+    @settings = load_settings
+    @checkbox_states = {}
+    @save_file_path = ""
+    @save_directory = ""
+    
+    tabs = FXTabBook.new(self, opts: LAYOUT_FILL)
+    
+    main_tab = FXTabItem.new(tabs, "Главная")
+    main_page = FXVerticalFrame.new(tabs, opts: LAYOUT_FILL)
+    
+    compressed_tab = FXTabItem.new(tabs, "Compressed")
+    compressed_page = FXVerticalFrame.new(tabs, opts: LAYOUT_FILL)
+    
+    log_tab = FXTabItem.new(tabs, "Логирование")
+    log_page = FXVerticalFrame.new(tabs, opts: LAYOUT_FILL)
+    
+    @log_textview = FXText.new(log_page, opts: LAYOUT_FILL | TEXT_READONLY)
+    
+    # Выбор файла (Главная)
+    file_frame = FXHorizontalFrame.new(main_page, opts: LAYOUT_FILL)
+    @entry = FXTextField.new(file_frame, 40)
+    FXButton.new(file_frame, "Выбрать файл").connect(SEL_COMMAND) { on_file_clicked }
+    
+    # Выбор файла (Compressed)
+    compressed_file_frame = FXHorizontalFrame.new(compressed_page, opts: LAYOUT_FILL)
+    @entry_compressed = FXTextField.new(compressed_file_frame, 40)
+    FXButton.new(compressed_file_frame, "Выбрать файл").connect(SEL_COMMAND) { compresed_bom_controller }
+    
+    # Кнопка конвертации (Compressed)
+    FXButton.new(compressed_page, "Compressed").connect(SEL_COMMAND) { compressed_bom_button_clicked }
+    
+    @text_entries = {}
+    @check_buttons = {}
+    
+    FIELD_LABELS.each_with_index do |label_text, i|
+      hbox_label = FXHorizontalFrame.new(main_page, opts: LAYOUT_FILL)
+      FXLabel.new(hbox_label, label_text)
+      
+      check_button = FXCheckButton.new(hbox_label, "")
+      check_button.checkState = @settings["checkbox_#{i}"] ? true : false
+      
+      entry = FXTextField.new(hbox_label, 20)
+      entry.text = @settings["checkbox_#{i}"] ? (@settings["field_#{i}"] || "") : ""
+      
+      check_button.connect(SEL_COMMAND) do
+        @checkbox_states[i] = check_button.checkState
+        @settings["checkbox_#{i}"] = check_button.checkState
+        if check_button.checkState
+          @settings["field_#{i}"] = entry.text
+        else
+          @settings.delete("field_#{i}")
+          entry.text = ""
+        end
+        save_settings
+      end
+      
+      entry.connect(SEL_CHANGED) do
+        if check_button.checkState
+          @settings["field_#{i}"] = entry.text
+          save_settings
+        end
+      end
+      
+      @text_entries[label_text] = entry
+      @check_buttons[label_text] = check_button
+    end
+    
+    FXButton.new(main_page, "Сконвертировать").connect(SEL_COMMAND) { on_convert_clicked }
+  end
+
+  def log_message(message)
+    @log_textview.appendText("#{Time.now}: #{message}\n")
+  end
+
+  def on_file_clicked
+    dialog = FXFileDialog.new(self, "Выберите файл")
+    dialog.selectMode = SELECTFILE_EXISTING
+    if dialog.execute != 0
+      @entry.text = dialog.filename
+      log_message("Файл выбран: #{dialog.filename}")
+    end
+  end
+
+  def compresed_bom_controller
+    dialog = FXFileDialog.new(self, "Выберите файл")
+    dialog.selectMode = SELECTFILE_EXISTING
+    if dialog.execute != 0
+      @entry_compressed.text = dialog.filename
+      log_message("Файл выбран: #{dialog.filename}")
+    end
+  end
+
+  def on_convert_clicked
+    excel_path = @entry.text
+    return log_message("Ошибка: Файл не выбран!") if excel_path.empty?
+    
+    dialog = FXFileDialog.new(self, "Сохранить файл")
+    dialog.selectMode = SELECTFILE_ANY
+    if dialog.execute != 0
+      @save_file_path = dialog.filename
+      field_values = Hash[FIELD_LABELS_FOR_REMOVED.zip(@text_entries.values.map(&:text))]
+      begin
+        require_relative 'index'
+        ExcelToDocx.generate_docx("template/shablon_pr.docx", excel_path, field_values, @save_file_path)
+        log_message("Файл успешно сконвертирован: #{@save_file_path}")
+      rescue StandardError => e
+        log_message("Ошибка конвертации: #{e.message}")
+      end
+    end
+  end
+
+  def compressed_bom_button_clicked
+    excel_path = @entry_compressed.text
+    return log_message("Ошибка: Файл не выбран!") if excel_path.empty?
+    
+    dialog = FXFileDialog.new(self, "Сохранить файл")
+    dialog.selectMode = SELECTFILE_ANY
+    if dialog.execute != 0
+      @save_file_path = dialog.filename
+      begin
+        require_relative 'compressed_bom'
+        CompressedBom.process_excel(excel_path, "#{@save_file_path}.xlsx")
+        log_message("Файл успешно сконвертирован: #{@save_file_path}")
+      rescue StandardError => e
+        log_message("Ошибка конвертации: #{e.message}")
+      end
+    end
+  end
+
+  def load_settings
+    return {} unless File.exist?(SETTINGS_FILE)
+    JSON.parse(File.read(SETTINGS_FILE))
+  rescue
+    {}
+  end
+
+  def save_settings
+    File.write(SETTINGS_FILE, JSON.pretty_generate(@settings))
+  end
+  
+  def create
+    super
+    show(PLACEMENT_SCREEN)
+  end
+end
+
+if __FILE__ == $0
+  app = FXApp.new
+  FileChooserApp.new(app)
+  app.create
+  app.run
+end
