@@ -14,3 +14,4 @@ gem 'zip'
 gem "pp"
 gem 'stringio'
 gem 'nokogiri'
+gem 'write_xlsx'
