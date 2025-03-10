@@ -1,41 +1,32 @@
-FROM ubuntu:latest
+# Используем образ Windows с поддержкой Ruby
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
-# Устанавливаем зависимости
-RUN apt update && apt install -y \
-    mingw-w64 \
-    ruby-full \
-    ruby-dev \
-    make \
-    gcc \
-    zip \
-    unzip \
-    git \
-    wget \
-    pkg-config \
-    libgtk-3-dev
+# Устанавливаем Chocolatey для управления пакетами
+RUN powershell -NoProfile -ExecutionPolicy Bypass -Command "& { \
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')) \
+}"
 
-# Устанавливаем Bundler
-RUN gem install bundler
+# Обновляем PATH для Chocolatey
+ENV PATH="C:\\ProgramData\\chocolatey\\bin;${PATH}"
 
-# Устанавливаем необходимые гемы
-COPY Gemfile Gemfile.lock ./
-RUN bundle install
+# Устанавливаем Ruby и GTK
+RUN choco install -y ruby gtksharp
 
-# Устанавливаем Ocra
-RUN gem install ocra
+# Добавляем Ruby в PATH
+ENV PATH="C:\\tools\\ruby31\\bin;${PATH}"
 
-# Копируем исходный код
+# Устанавливаем нужные гемы
+RUN gem install bundler ocra gtk3
+
+# Создаем директорию для приложения
 WORKDIR /app
-COPY . /app
 
-# Скачиваем GTK3 для Windows
-RUN wget -O gtk.zip "https://download.gnome.org/binaries/win64/gtk+-3.24.24.zip" \
-    && unzip gtk.zip -d /usr/local/gtk \
-    && rm gtk.zip
+# Копируем файлы проекта
+COPY . .
 
-# Экспортируем переменные среды для сборки
-ENV PATH="/usr/local/gtk/bin:$PATH"
-ENV PKG_CONFIG_PATH="/usr/local/gtk/lib/pkgconfig"
+# Запускаем компиляцию в exe с ocra
+RUN powershell -Command "ocra app.rb --windows --gem-all --output app.exe"
 
-# Компиляция EXE с Ocra
-CMD ["sh", "-c", "x86_64-w64-mingw32-ruby -S ocra app.rb --add-all-core --gem-all --dll gtk3"]
+# Устанавливаем команду по умолчанию
+CMD ["cmd"]
