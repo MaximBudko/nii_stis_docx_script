@@ -116,7 +116,6 @@ module ExcelToDocx
 
   def self.format_numbers(numbers)
     return numbers.first if numbers.size == 1
-
     sorted_numbers = numbers.sort_by { |num| num[/\d+/].to_i rescue num }
     ranges = []
     temp_range = [sorted_numbers.first]
@@ -206,11 +205,22 @@ module ExcelToDocx
     data
   end
 
+  def self.sort_by_groups(array)
+    grouped = array.group_by { |item| item[:number][/^[A-Za-z]+/] }
+    
+    # Сортируем только по числовой части внутри каждой группы
+    sorted = grouped.transform_values do |group|
+      group.sort_by { |item| item[:number][/\d+/].to_i }
+    end
+  
+    # Восстанавливаем порядок групп из исходного массива
+    array.map { |item| sorted[item[:number][/^[A-Za-z]+/]].shift }
+  end
+
   def self.generate_docx(docx_path, xlsx_path, field_values, new_file_path)
 
     xlsx = RubyXL::Parser.parse(xlsx_path)
     sheet = xlsx[0] # Берем первый лист
-
     values = field_values
     data = []
     last_value = nil
@@ -218,6 +228,7 @@ module ExcelToDocx
     count = 1
     current_numbers = []
     last_category = nil 
+    intermediate_data = []
 
     sheet.each_with_index do |row, index|
       next if index == 0  # Пропускаем первую строку (заголовки)
@@ -229,32 +240,36 @@ module ExcelToDocx
 
       description = "#{row[4]&.value.to_s.strip} #{row[5]&.value.to_s.strip}"
       characteristics = parse_characteristics(row[2]&.value.to_s.strip, row[6]&.value.to_s.strip, current_number)
-
-      # Определяем тип компонента по первым символам номера
-      component_type = CATEGORY_MAP.keys.find { |key| current_number.start_with?(key) }  # Поиск совпадения по начальной части строки
-
-      # Если значение то же, добавляем к текущим данным
-      if current_value == last_value && current_qnt == last_qnt
+      intermediate_data << {
+        number: current_number,
+        value: current_value,
+        qnt: current_qnt,
+        description: description,
+        characteristics: characteristics
+      }
+    end
+    intermediate = sort_by_groups(intermediate_data)
+    intermediate.each do |entry|
+      if entry[:value] == last_value && entry[:qnt] == last_qnt
         count += 1
-        current_numbers << current_number
+        current_numbers << entry[:number]
         data.last[2] = count.to_s
       else
         data.last[0] = format_numbers(current_numbers) unless current_numbers.empty?
         count = 1
-        current_numbers = [current_number]
+        current_numbers = [entry[:number]]
         data << [
-          current_number,
-          description,   # Описание
-          "1",           # Количество
-          characteristics # Характеристики
+          entry[:number],
+          entry[:description],
+          "1",  # Количество
+          entry[:characteristics]
         ]
       end
-      last_qnt = current_qnt
-      last_value = current_value
+      last_qnt = entry[:qnt]
+      last_value = entry[:value]
     end
 
     data.last[0] = format_numbers(current_numbers) unless current_numbers.empty?
-
     data1 = group_by_category(data)
     data2 = process_array(data1)
     data3 = move_first_to_end(data2)
