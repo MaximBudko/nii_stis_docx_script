@@ -40,6 +40,12 @@ module ExcelToDocx
     "Z" =>	["Кварцевый резонатор", "Кварцевые резонаторы"]
   }
 
+  ALIAS = {
+    "J" => "X",
+    "HL" => "H",
+    "SB" => "S"
+  }
+
   def self.parse_characteristics(value, tolerance, current_number)
     regxp_current_number = current_number[/\A[a-zA-Z]+/]
     value = value.gsub(",", ".") # Заменяем запятую на точку
@@ -158,27 +164,42 @@ module ExcelToDocx
 
   def self.group_by_category(data)
     grouped_data = Hash.new { |hash, key| hash[key] = [] }
-
+  
     # Группируем элементы по первой букве первого элемента (категория)
     data.each do |row|
       category_key = row[0][/\A[a-zA-Z]+/] # Берем первые 1-2 символа (например, "R", "C", "DA")
-      category_key = CATEGORY_MAP.keys.include?(category_key) ? category_key : category_key[0] # Проверяем, если нет двухбуквенного кода, берем первую букву
+  
+      # Проверяем наличие в CATEGORY_MAP, если нет - смотрим в ALIAS
+      unless CATEGORY_MAP.keys.include?(category_key)
+        # Если в ALIAS есть такой ключ, используем его
+        category_key = ALIAS[category_key] || category_key[0] # Если нет соответствия в ALIAS, берем первую букву
+      end
+  
+      # Находим имя категории в CATEGORY_MAP
       category_name = CATEGORY_MAP[category_key] || 'Неизвестная категория'
       grouped_data[category_name] << row
     end
+  
     # Формируем новый массив с заголовками
     result = []
     grouped_data.each do |category, items|
-      selected_key = items.size > 1 ? category[1] : category[0] 
+      selected_key = items.size > 1 ? category[1] : category[0]
+  
+      # Добавляем разделитель, если его нет в последней строке
       unless result.last == ["", "", "", ""]
         result << ["", "", "", ""]
       end
+  
+      # Добавляем строку с названием категории
       result << ["", selected_key, "", ""]
+      
+      # Добавляем сами элементы
       result.concat(items)
     end
-
+  
     result
   end
+  
 
   def self.move_first_to_end(arr)
     arr.push(arr.shift)
@@ -376,5 +397,6 @@ module ExcelToDocx
       end
     end
   end
+
 end
 
