@@ -96,6 +96,7 @@ class FileChooserApp < Gtk::Window
     @check_buttons = {}
 
     FIELD_LABELS.each_with_index do |label_text, i|
+      
       hbox_label = Gtk::Box.new(:horizontal, 10)
       main_box.pack_start(hbox_label, expand: false, fill: false, padding: 0)
       
@@ -139,10 +140,23 @@ class FileChooserApp < Gtk::Window
       @text_entries[label_text] = entry
       @check_buttons[label_text] = check_button
     end
-
+    hbox_button = Gtk::Box.new(:horizontal, 10)
+    hbox_button.homogeneous = true
+    
     @convert_button = Gtk::Button.new(label: "Сконвертировать")
-    main_box.pack_end(@convert_button, expand: false, fill: false, padding: 0)
+    hbox_button.pack_end(@convert_button, expand: true, fill: true, padding: 0)
     @convert_button.signal_connect("clicked") { on_convert_clicked }
+
+    @convert_button_spec = Gtk::Button.new(label: "Спецификация")
+    hbox_button.pack_end(@convert_button_spec, expand: true, fill: true, padding: 0)
+    @convert_button_spec.signal_connect("clicked") { on_convert_clicked }
+
+    @convert_button_vedomost = Gtk::Button.new(label: "Ведомость")
+    hbox_button.pack_end(@convert_button_vedomost, expand: true, fill: true, padding: 0)
+    @convert_button_vedomost.signal_connect("clicked") { on_convert_clicked }
+    
+    main_box.pack_end(hbox_button)
+
   end
 
   def log_message(message)
