@@ -163,45 +163,59 @@ module ExcelToDocx
   end
 
   def self.group_by_category(data)
-    grouped_data = Hash.new { |hash, key| hash[key] = [] }
+    grouped_data = {}
+    category_replacements = {}
   
-    # Группируем элементы по первой букве первого элемента (категория)
+    # 1️⃣ Формируем категории в порядке поступления
     data.each do |row|
-      category_key = row[0][/\A[a-zA-Z]+/] # Берем первые 1-2 символа (например, "R", "C", "DA")
+      category_key = row[0].to_s[/\A[a-zA-Z]+/] || ''
   
-      # Проверяем наличие в CATEGORY_MAP, если нет - смотрим в ALIAS
-      unless CATEGORY_MAP.keys.include?(category_key)
-        # Если в ALIAS есть такой ключ, используем его
-        category_key = ALIAS[category_key] || category_key[0] # Если нет соответствия в ALIAS, берем первую букву
+      # Проверяем, есть ли замена в ALIAS
+      if ALIAS.key?(category_key)
+        new_key = ALIAS[category_key]
+  
+        # Если новая категория уже существует, переносим туда
+        if grouped_data.key?(new_key)
+          grouped_data[new_key] += grouped_data.delete(category_key) if grouped_data.key?(category_key)
+        end
+  
+        category_replacements[category_key] = new_key
+        category_key = new_key
       end
   
-      # Находим имя категории в CATEGORY_MAP
-      category_name = CATEGORY_MAP[category_key] || 'Неизвестная категория'
+      category_name = CATEGORY_MAP[category_key] || category_key
+      grouped_data[category_name] ||= [] # Создаем категорию, если её нет
       grouped_data[category_name] << row
     end
   
-    # Формируем новый массив с заголовками
+    # 2️⃣ Сохраняем порядок следования категорий
+    ordered_categories = data.map { |row| row[0].to_s[/\A[a-zA-Z]+/] || '' }
+                             .uniq
+                             .map { |key| CATEGORY_MAP[key] || key }
+  
     result = []
-    grouped_data.each do |category, items|
-      selected_key = items.size > 1 ? category[1] : category[0]
+    ordered_categories.each do |category|
+      next unless grouped_data.key?(category) # Пропускаем пустые категории
   
-      # Добавляем разделитель, если его нет в последней строке
-      unless result.last == ["", "", "", ""]
-        result << ["", "", "", ""]
-      end
+      items = grouped_data[category]
+      next if items.empty? # Пропускаем заголовки без элементов
   
-      # Добавляем строку с названием категории
+      selected_key = category.length > 1 ? category[1] : category[0]
+  
+      result << ["", "", "", ""] unless result.empty? || result.last == ["", "", "", ""]
       result << ["", selected_key, "", ""]
-      
-      # Добавляем сами элементы
       result.concat(items)
     end
+  
+    # 🔥 Убираем лишний заголовок в конце (если есть)
+    result.pop while result.any? && result.last == ["", "", "", ""]
   
     result
   end
   
-
   def self.move_first_to_end(arr)
+    empty_row = ["", "", "", ""]
+    arr.insert(0, empty_row.dup)
     arr.push(arr.shift)
   end
 
