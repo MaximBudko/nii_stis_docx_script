@@ -1,10 +1,19 @@
 require 'gtk3'
 require 'json'
+require 'roo'
+require 'write_xlsx'
+require 'rubyXL'
+require 'zip'
+require 'nokogiri'
+require 'fileutils'
+require 'pp'
+require 'stringio'
+
 
 class FileChooserApp < Gtk::Window
-  SETTINGS_FILE = "saves/settings.json"
-  FIELD_LABELS = ["Перв. примен.", "Разраб.", "Пров.", "Н. контр.", "Утв.", "Дец. номер", "Наименование устройства", "Наименование организации"]
-  FIELD_LABELS_FOR_REMOVED = ["perv_primen", "razrab", "prover", "n_kontr", "utverd", "blpa", "device_name", "company_name"]
+  SETTINGS_FILE = File.expand_path('saves/settings.json', __dir__)
+  FIELD_LABELS = ["Перв. примен.", "Разраб.", "Пров.", "Н. контр.", "Утв.", "Дец. номер", "Наименование устройства", "Наименование организации","Номер изменения", "Нов / Зам", "Номер извещения"]
+  FIELD_LABELS_FOR_REMOVED = ["perv_primen", "razrab", "prover", "n_kontr", "utverd", "blpa", "device_name", "company_name","n_i", "n_z", "nom_iz"]
  
   def initialize
     super(Gtk::WindowType::TOPLEVEL)
@@ -28,7 +37,7 @@ class FileChooserApp < Gtk::Window
     main_box.set_margin_end(10)
     notebook.append_page(main_box, Gtk::Label.new("Главная"))
 
-    #----------------Код вкладки Compressed-------------------
+  #----------------Код вкладки Compressed-------------------
 
     compressed_box = Gtk::Box.new(:vertical, 10)
     compressed_box.set_margin_top(10)
@@ -37,7 +46,7 @@ class FileChooserApp < Gtk::Window
     compressed_box.set_margin_end(10)
     notebook.append_page(compressed_box, Gtk::Label.new("Compressed"))
     
-    #---------------------------------------------------------
+  #---------------------------------------------------------
 
     @log_textview = Gtk::TextView.new
     @log_textview.editable = false
@@ -47,7 +56,7 @@ class FileChooserApp < Gtk::Window
     log_scrolled.add(@log_textview)
     notebook.append_page(log_scrolled, Gtk::Label.new("Логирование"))
 
-    #--------------------Код выбора файла в main-----------------------
+  #--------------------Код выбора файла в main-----------------------
     hbox_file = Gtk::Box.new(:horizontal, 10)
     main_box.pack_start(hbox_file, expand: false, fill: false, padding: 0)
 
@@ -60,9 +69,9 @@ class FileChooserApp < Gtk::Window
     @button.signal_connect("clicked") { on_file_clicked }
     hbox_file.pack_start(@button, expand: false, fill: false, padding: 0)
 
-    #-------------------------------------------------------------------------
+  #-------------------------------------------------------------------------
 
-    #---------------Код выбора файла в Compressed-----------------------------
+  #---------------Код выбора файла в Compressed-----------------------------
     set_path_file_comp = Gtk::Box.new(:horizontal, 10)
     compressed_box.pack_start(set_path_file_comp, expand: false, fill: false, padding: 0)
 
@@ -75,13 +84,13 @@ class FileChooserApp < Gtk::Window
     @button_set_compressed = Gtk::Button.new(label: "Выбрать файл")
     @button_set_compressed.signal_connect("clicked") {compresed_bom_controller}
     set_path_file_comp.pack_start(@button_set_compressed, expand: false, fill: false, padding: 0)
-    #-------------------------------------------------------------------------
+  #-------------------------------------------------------------------------
 
-    #----------------Кнопка конвертации Compressed----------------------------
+  #----------------Кнопка конвертации Compressed----------------------------
     @compressed_bom_button = Gtk::Button.new(label: "Compressed")
     compressed_box.pack_start(@compressed_bom_button, expand: false, fill: false, padding: 0)
     @compressed_bom_button.signal_connect("clicked") { compressed_bom_button_clicked }
-    #-------------------------------------------------------------------------
+  #-------------------------------------------------------------------------
 
     @text_entries = {}
     @check_buttons = {}
@@ -193,7 +202,8 @@ class FileChooserApp < Gtk::Window
       field_values = Hash[FIELD_LABELS_FOR_REMOVED.zip(@text_entries.values.map(&:text))]
       begin
         require_relative 'index'
-        ExcelToDocx.generate_docx("template/shablon_pr.docx", excel_path, field_values, @save_file_path)
+        path_to_converted_docx = File.expand_path('template/shablon_pr.docx', __dir__)
+        ExcelToDocx.generate_docx(path_to_converted_docx, excel_path, field_values, @save_file_path)
         log_message("Файл успешно сконвертирован: #{@save_file_path}")
       rescue StandardError => e
         log_message("Ошибка конвертации: #{e.message}")
