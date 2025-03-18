@@ -317,106 +317,115 @@ module ExcelToDocx
       return
     end
 
-    Zip::File.open(new_docx_path) do |zip|
+    retries = 3
+    begin
+      Zip::File.open(new_docx_path) do |zip|
 
-      zip.glob('word/{header,footer}*.xml').each do |entry|
-        xml_content = entry.get_input_stream.read
-        doc = Nokogiri::XML(xml_content)
-        namespaces = { 'w' => 'http://schemas.openxmlformats.org/wordprocessingml/2006/main' }
+        zip.glob('word/{header,footer}*.xml').each do |entry|
+          xml_content = entry.get_input_stream.read
+          doc = Nokogiri::XML(xml_content)
+          namespaces = { 'w' => 'http://schemas.openxmlformats.org/wordprocessingml/2006/main' }
 
-        doc.xpath('//w:t', namespaces).each do |node|
-          text = node.text.strip
-          if text.empty?
-            node.content = ""
-            parent_run = node.ancestors('w:r').first
-          else
-            values.each do |key, value|
-              if text.include?(key)
-                node.content = value
+          doc.xpath('//w:t', namespaces).each do |node|
+            text = node.text.strip
+            if text.empty?
+              node.content = ""
+              parent_run = node.ancestors('w:r').first
+            else
+              values.each do |key, value|
+                if text.include?(key)
+                  node.content = value
+                end
               end
             end
           end
+          zip.get_output_stream(entry.name) { |f| f.write(doc.to_xml) }
         end
-        zip.get_output_stream(entry.name) { |f| f.write(doc.to_xml) }
-      end
 
-      document_xml = zip.find_entry("word/document.xml")
+        document_xml = zip.find_entry("word/document.xml")
 
-      if document_xml
-        xml_content = document_xml.get_input_stream.read
-        doc = Nokogiri::XML(xml_content)
-        tables = doc.xpath("//w:tbl", "w" => "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
+        if document_xml
+          xml_content = document_xml.get_input_stream.read
+          doc = Nokogiri::XML(xml_content)
+          tables = doc.xpath("//w:tbl", "w" => "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
 
-        tables.each do |table|
+          tables.each do |table|
 
-          data5.each do |row_data|  
-            new_row = Nokogiri::XML::Node.new("w:tr", doc)
-            row_properties = Nokogiri::XML::Node.new("w:trPr", doc)
-            row_height = Nokogiri::XML::Node.new("w:trHeight", doc)
-            row_height['w:val'] = "453"
-            row_height['w:hRule'] = "exact"
-            row_properties.add_child(row_height)
-            new_row.add_child(row_properties)
-            
-            formatted_cells = []
-            row_data.each_with_index do |value, index|
-              cell = Nokogiri::XML::Node.new("w:tc", doc)
-              cell_properties = Nokogiri::XML::Node.new("w:tcPr", doc)
+            data5.each do |row_data|  
+              new_row = Nokogiri::XML::Node.new("w:tr", doc)
+              row_properties = Nokogiri::XML::Node.new("w:trPr", doc)
+              row_height = Nokogiri::XML::Node.new("w:trHeight", doc)
+              row_height['w:val'] = "453"
+              row_height['w:hRule'] = "exact"
+              row_properties.add_child(row_height)
+              new_row.add_child(row_properties)
               
+              formatted_cells = []
+              row_data.each_with_index do |value, index|
+                cell = Nokogiri::XML::Node.new("w:tc", doc)
+                cell_properties = Nokogiri::XML::Node.new("w:tcPr", doc)
+                
 
-              borders = Nokogiri::XML::Node.new("w:tcBorders", doc)
-              ["w:top", "w:bottom", "w:left", "w:right"].each do |side|
-                border = Nokogiri::XML::Node.new(side, doc)
-                border['w:val'] = "single"  # Сплошная линия
-                border['w:sz'] = "10"        # Толщина границы
-                border['w:color'] = "000000" # Черный цвет
-                borders.add_child(border)
+                borders = Nokogiri::XML::Node.new("w:tcBorders", doc)
+                ["w:top", "w:bottom", "w:left", "w:right"].each do |side|
+                  border = Nokogiri::XML::Node.new(side, doc)
+                  border['w:val'] = "single"  # Сплошная линия
+                  border['w:sz'] = "10"        # Толщина границы
+                  border['w:color'] = "000000" # Черный цвет
+                  borders.add_child(border)
+                end
+                cell_properties.add_child(borders)
+
+                v_align = Nokogiri::XML::Node.new("w:vAlign", doc)
+                v_align['w:val'] = 'center'  
+                cell_properties.add_child(v_align)
+
+                paragraph = Nokogiri::XML::Node.new("w:p", doc)
+                paragraph_properties = Nokogiri::XML::Node.new("w:pPr", doc)
+                paragraph.add_child(paragraph_properties)
+                run = Nokogiri::XML::Node.new("w:r", doc)
+                text_node = Nokogiri::XML::Node.new("w:t", doc)
+                text_node.content = value
+
+                run_properties = Nokogiri::XML::Node.new("w:rPr", doc)
+                font = Nokogiri::XML::Node.new("w:rFonts", doc)
+                font['w:ascii'] = "GOST Type A"
+                font['w:hAnsi'] = "GOST Type A"
+                font['w:eastAsia'] = "GOST Type A"
+                font['w:cs'] = "GOST Type A"
+                run_properties.add_child(font)
+
+                size = Nokogiri::XML::Node.new("w:sz", doc)
+                size['w:val'] = "28"
+                run_properties.add_child(size)
+
+                italic = Nokogiri::XML::Node.new("w:i", doc)
+                run_properties.add_child(italic)
+
+                run.add_child(run_properties)
+                run.add_child(text_node)
+                paragraph.add_child(run)
+                cell.add_child(paragraph)
+                cell.add_child(cell_properties)
+                new_row.add_child(cell)
+                formatted_cells << cell
               end
-              cell_properties.add_child(borders)
 
-              v_align = Nokogiri::XML::Node.new("w:vAlign", doc)
-              v_align['w:val'] = 'center'  
-              cell_properties.add_child(v_align)
-
-              paragraph = Nokogiri::XML::Node.new("w:p", doc)
-              paragraph_properties = Nokogiri::XML::Node.new("w:pPr", doc)
-              paragraph.add_child(paragraph_properties)
-              run = Nokogiri::XML::Node.new("w:r", doc)
-              text_node = Nokogiri::XML::Node.new("w:t", doc)
-              text_node.content = value
-
-              run_properties = Nokogiri::XML::Node.new("w:rPr", doc)
-              font = Nokogiri::XML::Node.new("w:rFonts", doc)
-              font['w:ascii'] = "GOST Type A"
-              font['w:hAnsi'] = "GOST Type A"
-              font['w:eastAsia'] = "GOST Type A"
-              font['w:cs'] = "GOST Type A"
-              run_properties.add_child(font)
-
-              size = Nokogiri::XML::Node.new("w:sz", doc)
-              size['w:val'] = "28"
-              run_properties.add_child(size)
-
-              italic = Nokogiri::XML::Node.new("w:i", doc)
-              run_properties.add_child(italic)
-
-              run.add_child(run_properties)
-              run.add_child(text_node)
-              paragraph.add_child(run)
-              cell.add_child(paragraph)
-              cell.add_child(cell_properties)
-              new_row.add_child(cell)
-              formatted_cells << cell
+              table.add_child(new_row)
             end
-
-            table.add_child(new_row)
           end
+         zip.get_output_stream("word/document.xml") { |f| f.write(doc.to_xml) }
         end
-       zip.get_output_stream("word/document.xml") { |f| f.write(doc.to_xml) }
+      end
+    rescue Errno::EACCES => e
+      if retries > 0
+        retries -= 1
+        sleep 1
+        retry
+      else
+        puts "Permission denied while processing the file: #{e.message}"
       end
     end
-  rescue Errno::EACCES => e
-    puts "Permission denied while processing the file: #{e.message}"
   end
 
 end
