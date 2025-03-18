@@ -253,7 +253,6 @@ module ExcelToDocx
   end
 
   def self.generate_docx(docx_path, xlsx_path, field_values, new_file_path)
-
     xlsx = RubyXL::Parser.parse(xlsx_path)
     sheet = xlsx[0] # Берем первый лист
     values = field_values
@@ -311,7 +310,13 @@ module ExcelToDocx
     data5 = insert_empty_and_move(data3)
     new_docx_path = new_file_path + ".docx"
     
-    FileUtils.cp(docx_path, new_docx_path)
+    begin
+      FileUtils.cp(docx_path, new_docx_path)
+    rescue Errno::EACCES => e
+      puts "Permission denied while copying the file: #{e.message}"
+      return
+    end
+
     Zip::File.open(new_docx_path) do |zip|
 
       zip.glob('word/{header,footer}*.xml').each do |entry|
@@ -410,6 +415,8 @@ module ExcelToDocx
        zip.get_output_stream("word/document.xml") { |f| f.write(doc.to_xml) }
       end
     end
+  rescue Errno::EACCES => e
+    puts "Permission denied while processing the file: #{e.message}"
   end
 
 end
