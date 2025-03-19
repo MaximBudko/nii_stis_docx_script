@@ -1,7 +1,7 @@
-ENV['GI_TYPELIB_PATH'] = File.expand_path('for_build\girepository-1.0', __dir__)
-ENV['FONTCONFIG_PATH'] = File.expand_path('for_build\fonts', __dir__)
-ENV['XDG_DATA_DIRS'] = File.expand_path('for_build\share', __dir__)
-ENV['GSETTINGS_SCHEMA_DIR'] = File.expand_path('for_build\schemas', __dir__)
+# ENV['GI_TYPELIB_PATH'] = File.expand_path('for_build\girepository-1.0', __dir__)
+# ENV['FONTCONFIG_PATH'] = File.expand_path('for_build\fonts', __dir__)
+# ENV['XDG_DATA_DIRS'] = File.expand_path('for_build\share', __dir__)
+# ENV['GSETTINGS_SCHEMA_DIR'] = File.expand_path('for_build\schemas', __dir__)
 
 require 'gtk3'
 require 'json'
@@ -154,7 +154,7 @@ class FileChooserApp < Gtk::Window
 
   @convert_button_spec = Gtk::Button.new(label: "Спецификация")
   hbox_button.pack_end(@convert_button_spec, expand: true, fill: true, padding: 0)
-  @convert_button_spec.signal_connect("clicked") { on_convert_clicked }
+  @convert_button_spec.signal_connect("clicked") { specifiacation_button_clicked }
 
   @convert_button_vedomost = Gtk::Button.new(label: "Ведомость")
   hbox_button.pack_end(@convert_button_vedomost, expand: true, fill: true, padding: 0)
@@ -231,7 +231,39 @@ def on_convert_clicked
   save_dialog.destroy
 end
 
+#----------------------------------Вызов спецификации---------------------------
+def specifiacation_button_clicked
+  excel_path = @entry.text
+  if excel_path.empty?
+    log_message("Ошибка: Файл не выбран!")
+    return
+  end
 
+  save_dialog = Gtk::FileChooserDialog.new(
+    title: "Сохранить файл",
+    parent: self,
+    action: Gtk::FileChooserAction::SAVE,
+    buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Сохранить", Gtk::ResponseType::OK]]
+  )
+  save_dialog.set_do_overwrite_confirmation(true)
+
+  if save_dialog.run == Gtk::ResponseType::OK
+    @save_file_path = save_dialog.filename
+    file_name = File.basename(@save_file_path)
+    field_values = Hash[FIELD_LABELS_FOR_REMOVED.zip(@text_entries.values.map(&:text))]
+    input_int = 10
+    begin
+      require_relative 'spec'
+      path_to_converted_docx = File.expand_path('template/shablon_sp.docx', __dir__)
+      Spec.generate_spec(path_to_converted_docx, excel_path, field_values, @save_file_path, input_int)
+      log_message("Файл успешно сконвертирован: #{@save_file_path}")
+    rescue StandardError => e
+      log_message("Ошибка конвертации: #{e.message}")
+    end
+  end
+  save_dialog.destroy
+end
+#--------------------------------------------------------------
 #-----------------------Compressed BOM вызов функции----------
 
 def compressed_bom_button_clicked
