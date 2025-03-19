@@ -1,3 +1,8 @@
+ENV['GI_TYPELIB_PATH'] = File.expand_path('for_build\girepository-1.0', __dir__)
+ENV['FONTCONFIG_PATH'] = File.expand_path('for_build\fonts', __dir__)
+ENV['XDG_DATA_DIRS'] = File.expand_path('for_build\share', __dir__)
+ENV['GSETTINGS_SCHEMA_DIR'] = File.expand_path('for_build\schemas', __dir__)
+
 require 'gtk3'
 require 'json'
 require 'roo'
@@ -8,7 +13,6 @@ require 'nokogiri'
 require 'fileutils'
 require 'pp'
 require 'stringio'
-require_relative 'file_helper'
 
 
 class FileChooserApp < Gtk::Window
@@ -93,197 +97,187 @@ class FileChooserApp < Gtk::Window
     @compressed_bom_button.signal_connect("clicked") { compressed_bom_button_clicked }
   #-------------------------------------------------------------------------
 
-    @text_entries = {}
-    @check_buttons = {}
+  @text_entries = {}
+  @check_buttons = {}
 
-    FIELD_LABELS.each_with_index do |label_text, i|
-      
-      hbox_label = Gtk::Box.new(:horizontal, 10)
-      main_box.pack_start(hbox_label, expand: false, fill: false, padding: 0)
-      
-      label = Gtk::Label.new(label_text)
-      label.set_xalign(0)
-      hbox_label.pack_start(label, expand: true, fill: true, padding: 0)
-      
-      hbox = Gtk::Box.new(:horizontal, 10)
-      main_box.pack_start(hbox, expand: false, fill: false, padding: 0)
+  FIELD_LABELS.each_with_index do |label_text, i|
+    
+    hbox_label = Gtk::Box.new(:horizontal, 10)
+    main_box.pack_start(hbox_label, expand: false, fill: false, padding: 0)
+    
+    label = Gtk::Label.new(label_text)
+    label.set_xalign(0)
+    hbox_label.pack_start(label, expand: true, fill: true, padding: 0)
+    
+    hbox = Gtk::Box.new(:horizontal, 10)
+    main_box.pack_start(hbox, expand: false, fill: false, padding: 0)
 
-      check_button = Gtk::CheckButton.new
-      check_button.active = @settings["checkbox_#{i}"]
-      hbox.pack_start(check_button, expand: false, fill: false, padding: 0)
-      
-      entry = Gtk::Entry.new
-      entry.set_hexpand(true)
-      entry.set_text(@settings["checkbox_#{i}"] ? (@settings["field_#{i}"] || "") : "")
-      hbox.pack_start(entry, expand: true, fill: true, padding: 0)
-      
+    check_button = Gtk::CheckButton.new
+    check_button.active = @settings["checkbox_#{i}"]
+    hbox.pack_start(check_button, expand: false, fill: false, padding: 0)
+    
+    entry = Gtk::Entry.new
+    entry.set_hexpand(true)
+    entry.set_text(@settings["checkbox_#{i}"] ? (@settings["field_#{i}"] || "") : "")
+    hbox.pack_start(entry, expand: true, fill: true, padding: 0)
+    
+    @checkbox_states[i] = check_button.active?
+    
+    check_button.signal_connect("toggled") do
       @checkbox_states[i] = check_button.active?
-      
-      check_button.signal_connect("toggled") do
-        @checkbox_states[i] = check_button.active?
-        @settings["checkbox_#{i}"] = check_button.active?
-        if check_button.active?
-          @settings["field_#{i}"] = entry.text
-        else
-          @settings.delete("field_#{i}")
-          entry.set_text("")
-        end
+      @settings["checkbox_#{i}"] = check_button.active?
+      if check_button.active?
+        @settings["field_#{i}"] = entry.text
+      else
+        @settings.delete("field_#{i}")
+        entry.set_text("")
+      end
+      save_settings
+    end
+    
+    entry.signal_connect("changed") do
+      if check_button.active?
+        @settings["field_#{i}"] = entry.text
         save_settings
       end
-      
-      entry.signal_connect("changed") do
-        if check_button.active?
-          @settings["field_#{i}"] = entry.text
-          save_settings
-        end
-      end
-      
-      @text_entries[label_text] = entry
-      @check_buttons[label_text] = check_button
     end
-    hbox_button = Gtk::Box.new(:horizontal, 10)
-    hbox_button.homogeneous = true
     
-    @convert_button = Gtk::Button.new(label: "Сконвертировать")
-    hbox_button.pack_end(@convert_button, expand: true, fill: true, padding: 0)
-    @convert_button.signal_connect("clicked") { on_convert_clicked }
-
-    @convert_button_spec = Gtk::Button.new(label: "Спецификация")
-    hbox_button.pack_end(@convert_button_spec, expand: true, fill: true, padding: 0)
-    @convert_button_spec.signal_connect("clicked") { on_convert_clicked }
-
-    @convert_button_vedomost = Gtk::Button.new(label: "Ведомость")
-    hbox_button.pack_end(@convert_button_vedomost, expand: true, fill: true, padding: 0)
-    @convert_button_vedomost.signal_connect("clicked") { on_convert_clicked }
-    
-    main_box.pack_end(hbox_button)
-
+    @text_entries[label_text] = entry
+    @check_buttons[label_text] = check_button
   end
-
-  def log_message(message)
-    iter = @log_buffer.end_iter
-    @log_buffer.insert(iter, "#{Time.now}: #{message}\n")
-  end
-
-  def on_file_clicked
-    dialog = Gtk::FileChooserDialog.new(
-      title: "Выберите файл",
-      parent: self,
-      action: Gtk::FileChooserAction::OPEN,
-      buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Открыть", Gtk::ResponseType::OK]]
-    )
-
-    if dialog.run == Gtk::ResponseType::OK
-      @entry.set_text(dialog.filename)
-      log_message("Файл выбран: #{dialog.filename}")
-    end
-    dialog.destroy
-  end
+  hbox_button = Gtk::Box.new(:horizontal, 10)
+  hbox_button.homogeneous = true
   
-  def compresed_bom_controller
-    dialog_comp = Gtk::FileChooserDialog.new(
-      title: "Выберите файл",
-      parent: self,
-      action: Gtk::FileChooserAction::OPEN,
-      buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Открыть", Gtk::ResponseType::OK]]
-    )
+  @convert_button = Gtk::Button.new(label: "Сконвертировать")
+  hbox_button.pack_end(@convert_button, expand: true, fill: true, padding: 0)
+  @convert_button.signal_connect("clicked") { on_convert_clicked }
 
-    if dialog_comp.run == Gtk::ResponseType::OK
-      @entry_compressed.set_text(dialog_comp.filename)
-      log_message("Файл выбран: #{dialog_comp.filename}")
-    end
-    dialog_comp.destroy
+  @convert_button_spec = Gtk::Button.new(label: "Спецификация")
+  hbox_button.pack_end(@convert_button_spec, expand: true, fill: true, padding: 0)
+  @convert_button_spec.signal_connect("clicked") { on_convert_clicked }
+
+  @convert_button_vedomost = Gtk::Button.new(label: "Ведомость")
+  hbox_button.pack_end(@convert_button_vedomost, expand: true, fill: true, padding: 0)
+  @convert_button_vedomost.signal_connect("clicked") { on_convert_clicked }
+  
+  main_box.pack_end(hbox_button)
+
+end
+
+def log_message(message)
+  iter = @log_buffer.end_iter
+  @log_buffer.insert(iter, "#{Time.now}: #{message}\n")
+end
+
+def on_file_clicked
+  dialog = Gtk::FileChooserDialog.new(
+    title: "Выберите файл",
+    parent: self,
+    action: Gtk::FileChooserAction::OPEN,
+    buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Открыть", Gtk::ResponseType::OK]]
+  )
+
+  if dialog.run == Gtk::ResponseType::OK
+    @entry.set_text(dialog.filename)
+    log_message("Файл выбран: #{dialog.filename}")
+  end
+  dialog.destroy
+end
+
+def compresed_bom_controller
+  dialog_comp = Gtk::FileChooserDialog.new(
+    title: "Выберите файл",
+    parent: self,
+    action: Gtk::FileChooserAction::OPEN,
+    buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Открыть", Gtk::ResponseType::OK]]
+  )
+
+  if dialog_comp.run == Gtk::ResponseType::OK
+    @entry_compressed.set_text(dialog_comp.filename)
+    log_message("Файл выбран: #{dialog_comp.filename}")
+  end
+  dialog_comp.destroy
+end
+
+
+def on_convert_clicked
+  excel_path = @entry.text
+  if excel_path.empty?
+    log_message("Ошибка: Файл не выбран!")
+    return
   end
 
-  def normalize_path(path)
-    # Convert forward slashes to backslashes on Windows
-    return path.gsub('/', '\\') if RUBY_PLATFORM =~ /mswin|mingw|windows/
-    path
-  end
+  save_dialog = Gtk::FileChooserDialog.new(
+    title: "Сохранить файл",
+    parent: self,
+    action: Gtk::FileChooserAction::SAVE,
+    buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Сохранить", Gtk::ResponseType::OK]]
+  )
+  save_dialog.set_do_overwrite_confirmation(true)
 
-  def on_convert_clicked
-    excel_path = normalize_path(@entry.text)
-    if excel_path.empty?
-      log_message("Ошибка: Файл не выбран!")
-      return
+  if save_dialog.run == Gtk::ResponseType::OK
+    @save_file_path = save_dialog.filename
+    file_name = File.basename(@save_file_path)
+    field_values = Hash[FIELD_LABELS_FOR_REMOVED.zip(@text_entries.values.map(&:text))]
+    begin
+      require_relative 'index'
+      path_to_converted_docx = File.expand_path('template/shablon_pr.docx', __dir__)
+      ExcelToDocx.generate_docx(path_to_converted_docx, excel_path, field_values, @save_file_path)
+      log_message("Файл успешно сконвертирован: #{@save_file_path}")
+    rescue StandardError => e
+      log_message("Ошибка конвертации: #{e.message}")
     end
-
-    save_dialog = Gtk::FileChooserDialog.new(
-      title: "Сохранить файл",
-      parent: self,
-      action: Gtk::FileChooserAction::SAVE,
-      buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Сохранить", Gtk::ResponseType::OK]]
-    )
-    save_dialog.set_do_overwrite_confirmation(true)
-
-    if save_dialog.run == Gtk::ResponseType::OK
-      @save_file_path = normalize_path(save_dialog.filename)
-      field_values = Hash[FIELD_LABELS_FOR_REMOVED.zip(@text_entries.values.map(&:text))]
-      begin
-        require_relative 'index'
-        template_path = normalize_path(File.expand_path('template/shablon_pr.docx', __dir__))
-        
-        # Ensure the target directory exists and is writable
-        target_dir = File.dirname(@save_file_path)
-        FileUtils.mkdir_p(target_dir)
-        
-        ExcelToDocx.generate_docx(template_path, excel_path, field_values, @save_file_path)
-        log_message("Файл успешно сконвертирован: #{@save_file_path}")
-      rescue StandardError => e
-        log_message("Ошибка конвертации: #{e.message}")
-        puts e.backtrace
-      end
-    end
-    save_dialog.destroy
   end
+  save_dialog.destroy
+end
 
 
 #-----------------------Compressed BOM вызов функции----------
 
-  def compressed_bom_button_clicked
-    excel_path = @entry_compressed.text
-    if excel_path.empty?
-      log_message("Ошибка: Файл не выбран!")
-      return
-    end
-
-    save_dialog = Gtk::FileChooserDialog.new(
-      title: "Сохранить файл",
-      parent: self,
-      action: Gtk::FileChooserAction::SAVE,
-      buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Сохранить", Gtk::ResponseType::OK]]
-    )
-    save_dialog.set_do_overwrite_confirmation(true)
-
-    if save_dialog.run == Gtk::ResponseType::OK
-      @save_file_path = save_dialog.filename
-      file_name = File.basename(@save_file_path)
-      begin
-        require_relative 'compressed_bom'
-        CompressedBom.process_excel(excel_path, "#{@save_file_path}.xlsx")
-        log_message("Файл успешно сконвертирован: #{@save_file_path}")
-      rescue StandardError => e
-        log_message("Ошибка конвертации: #{e.message}")
-      end
-    end
-    save_dialog.destroy
+def compressed_bom_button_clicked
+  excel_path = @entry_compressed.text
+  if excel_path.empty?
+    log_message("Ошибка: Файл не выбран!")
+    return
   end
+
+  save_dialog = Gtk::FileChooserDialog.new(
+    title: "Сохранить файл",
+    parent: self,
+    action: Gtk::FileChooserAction::SAVE,
+    buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Сохранить", Gtk::ResponseType::OK]]
+  )
+  save_dialog.set_do_overwrite_confirmation(true)
+
+  if save_dialog.run == Gtk::ResponseType::OK
+    @save_file_path = save_dialog.filename
+    file_name = File.basename(@save_file_path)
+    begin
+      require_relative 'compressed_bom'
+      CompressedBom.process_excel(excel_path, "#{@save_file_path}.xlsx")
+      log_message("Файл успешно сконвертирован: #{@save_file_path}")
+    rescue StandardError => e
+      log_message("Ошибка конвертации: #{e.message}")
+    end
+  end
+  save_dialog.destroy
+end
 
 #-------------------------------------------------------------
-  def load_settings
-    return {} unless File.exist?(SETTINGS_FILE)
-    JSON.parse(File.read(SETTINGS_FILE))
-  rescue
-    {}
-  end
+def load_settings
+  return {} unless File.exist?(SETTINGS_FILE)
+  JSON.parse(File.read(SETTINGS_FILE))
+rescue
+  {}
+end
 
-  def save_settings
-    File.write(SETTINGS_FILE, JSON.pretty_generate(@settings))
-  end
+def save_settings
+  File.write(SETTINGS_FILE, JSON.pretty_generate(@settings))
+end
 end
 
 if __FILE__ == $0
-  app = FileChooserApp.new
-  app.show_all
-  Gtk.main
+app = FileChooserApp.new
+app.show_all
+Gtk.main
 end

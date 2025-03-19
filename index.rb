@@ -4,7 +4,6 @@ require 'nokogiri'
 require 'fileutils'
 require 'pp'
 require 'stringio'
-require_relative 'file_helper'
 
 module ExcelToDocx
   # Словарь замен единиц измерения
@@ -253,32 +252,6 @@ module ExcelToDocx
     array.map { |item| sorted[item[:number][/^[A-Za-z]+/]].shift }
   end
 
-  def self.safe_file_operation(temp_path, new_docx_path)
-    max_attempts = 5
-    attempts = 0
-    
-    begin
-      # Force garbage collection and close handles
-      GC.start
-      sleep(0.5)
-      
-      if File.exist?(new_docx_path)
-        File.unlink(new_docx_path) rescue nil
-      end
-      
-      # Try to move the file
-      FileUtils.mv(temp_path, new_docx_path)
-    rescue Errno::EACCES => e
-      attempts += 1
-      if attempts < max_attempts
-        sleep(1)
-        retry
-      else
-        raise e
-      end
-    end
-  end
-
   def self.generate_docx(docx_path, xlsx_path, field_values, new_file_path)
     xlsx = RubyXL::Parser.parse(xlsx_path)
     sheet = xlsx[0] # Берем первый лист
@@ -336,15 +309,18 @@ module ExcelToDocx
     data3 = move_first_to_end(data2)
     data5 = insert_empty_and_move(data3)
     new_docx_path = new_file_path + ".docx"
-    temp_path = new_file_path + "_temp_#{Time.now.to_i}.docx"
-    working_temp_path = temp_path + ".working"
-
+    
     begin
-      # First, make a clean copy of the template
-      FileUtils.cp(docx_path, working_temp_path)
-      
-      # Process the working copy
-      Zip::File.open(working_temp_path) do |zip|
+      sleep 0.5
+      FileUtils.cp(docx_path, new_docx_path)
+    rescue Errno::EACCES => e
+      puts "Permission denied while copying the file: #{e.message}"
+      return
+    end
+    retries = 1
+    begin
+      Zip::File.open(new_docx_path) do |zip|
+        sleep(1) 
         zip.glob('word/{header,footer}*.xml').each do |entry|
           xml_content = entry.get_input_stream.read
           doc = Nokogiri::XML(xml_content)
@@ -367,15 +343,21 @@ module ExcelToDocx
         end
 
         document_xml = zip.find_entry("word/document.xml")
-
+        sleep(1)
         if document_xml
           xml_content = document_xml.get_input_stream.read
           doc = Nokogiri::XML(xml_content)
           tables = doc.xpath("//w:tbl", "w" => "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
 
           tables.each do |table|
-
-            data5.each do |row_data|  
+            
+              start_time = Time.now
+              while Time.now - start_time < 5
+                # Ваше действие здесь
+                puts "Действие выполняется..."# Для имитации длительного выполнения действия, можно адаптировать под нужды
+              end
+            data5.each do |row_data|
+                
               new_row = Nokogiri::XML::Node.new("w:tr", doc)
               row_properties = Nokogiri::XML::Node.new("w:trPr", doc)
               row_height = Nokogiri::XML::Node.new("w:trHeight", doc)
@@ -438,33 +420,17 @@ module ExcelToDocx
               table.add_child(new_row)
             end
           end
-          zip.get_output_stream("word/document.xml") { |f| f.write(doc.to_xml) }
-          zip.close
+         zip.get_output_stream("word/document.xml") { |f| f.write(doc.to_xml) }
         end
       end
-
-      # Force close any open handles
-      GC.start
-      sleep(0.2)
-
-      # Now safely move the file to its final destination
-      if File.exist?(new_docx_path)
-        File.delete(new_docx_path) rescue nil
+    rescue Errno::EACCES => e
+      if retries > 0
+        retries -= 1
+        sleep(1)
+        retry
+      else
+        puts "Permission denied while processing the file: #{e.message}"
       end
-
-      # Use FileUtils.mv instead of File.rename
-      FileUtils.mv(working_temp_path, new_docx_path)
-
-    rescue => e
-      puts "Error during file processing: #{e.message}"
-      File.delete(working_temp_path) rescue nil
-      File.delete(temp_path) rescue nil
-      raise e
-    ensure
-      # Cleanup
-      File.delete(working_temp_path) rescue nil
-      File.delete(temp_path) rescue nil
-      GC.start
     end
   end
 
