@@ -8,6 +8,7 @@ require 'nokogiri'
 require 'fileutils'
 require 'pp'
 require 'stringio'
+require_relative 'file_helper'
 
 
 class FileChooserApp < Gtk::Window
@@ -212,15 +213,20 @@ class FileChooserApp < Gtk::Window
 
     if save_dialog.run == Gtk::ResponseType::OK
       @save_file_path = save_dialog.filename
-      file_name = File.basename(@save_file_path)
       field_values = Hash[FIELD_LABELS_FOR_REMOVED.zip(@text_entries.values.map(&:text))]
       begin
         require_relative 'index'
-        path_to_converted_docx = File.expand_path('template/shablon_pr.docx', __dir__)
-        ExcelToDocx.generate_docx(path_to_converted_docx, excel_path, field_values, @save_file_path)
+        template_path = File.expand_path('template/shablon_pr.docx', __dir__)
+        
+        # Ensure the target directory exists and is writable
+        target_dir = File.dirname(@save_file_path)
+        FileUtils.mkdir_p(target_dir) unless File.directory?(target_dir)
+        
+        ExcelToDocx.generate_docx(template_path, excel_path, field_values, @save_file_path)
         log_message("Файл успешно сконвертирован: #{@save_file_path}")
       rescue StandardError => e
         log_message("Ошибка конвертации: #{e.message}")
+        puts e.backtrace
       end
     end
     save_dialog.destroy

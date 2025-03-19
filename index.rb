@@ -4,6 +4,7 @@ require 'nokogiri'
 require 'fileutils'
 require 'pp'
 require 'stringio'
+require_relative 'file_helper'
 
 module ExcelToDocx
   # Словарь замен единиц измерения
@@ -339,7 +340,7 @@ module ExcelToDocx
 
     begin
       # Copy to temp file
-      FileUtils.cp(docx_path, temp_path)
+      FileHelper.safe_copy(docx_path, temp_path)
       
       # Process the temp file
       Zip::File.open(temp_path) do |zip|
@@ -445,7 +446,7 @@ module ExcelToDocx
       sleep(0.1)
       
       # Try to move temp file to final location
-      safe_file_operation(temp_path, new_docx_path)
+      FileHelper.safe_move(temp_path, new_docx_path)
       
     rescue => e
       puts "Error during file processing: #{e.message}"
