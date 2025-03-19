@@ -467,6 +467,6 @@ module ExcelToDocx
       GC.start
     end
   end
-      
+
 end
 
