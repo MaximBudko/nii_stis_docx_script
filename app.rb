@@ -195,9 +195,14 @@ class FileChooserApp < Gtk::Window
     dialog_comp.destroy
   end
 
+  def normalize_path(path)
+    # Convert forward slashes to backslashes on Windows
+    return path.gsub('/', '\\') if RUBY_PLATFORM =~ /mswin|mingw|windows/
+    path
+  end
 
   def on_convert_clicked
-    excel_path = @entry.text
+    excel_path = normalize_path(@entry.text)
     if excel_path.empty?
       log_message("Ошибка: Файл не выбран!")
       return
@@ -212,15 +217,15 @@ class FileChooserApp < Gtk::Window
     save_dialog.set_do_overwrite_confirmation(true)
 
     if save_dialog.run == Gtk::ResponseType::OK
-      @save_file_path = save_dialog.filename
+      @save_file_path = normalize_path(save_dialog.filename)
       field_values = Hash[FIELD_LABELS_FOR_REMOVED.zip(@text_entries.values.map(&:text))]
       begin
         require_relative 'index'
-        template_path = File.expand_path('template/shablon_pr.docx', __dir__)
+        template_path = normalize_path(File.expand_path('template/shablon_pr.docx', __dir__))
         
         # Ensure the target directory exists and is writable
         target_dir = File.dirname(@save_file_path)
-        FileUtils.mkdir_p(target_dir) unless File.directory?(target_dir)
+        FileUtils.mkdir_p(target_dir)
         
         ExcelToDocx.generate_docx(template_path, excel_path, field_values, @save_file_path)
         log_message("Файл успешно сконвертирован: #{@save_file_path}")

@@ -337,13 +337,14 @@ module ExcelToDocx
     data5 = insert_empty_and_move(data3)
     new_docx_path = new_file_path + ".docx"
     temp_path = new_file_path + "_temp_#{Time.now.to_i}.docx"
+    working_temp_path = temp_path + ".working"
 
     begin
-      # Copy to temp file
-      FileHelper.safe_copy(docx_path, temp_path)
+      # First, make a clean copy of the template
+      FileUtils.cp(docx_path, working_temp_path)
       
-      # Process the temp file
-      Zip::File.open(temp_path) do |zip|
+      # Process the working copy
+      Zip::File.open(working_temp_path) do |zip|
         zip.glob('word/{header,footer}*.xml').each do |entry|
           xml_content = entry.get_input_stream.read
           doc = Nokogiri::XML(xml_content)
@@ -438,23 +439,31 @@ module ExcelToDocx
             end
           end
           zip.get_output_stream("word/document.xml") { |f| f.write(doc.to_xml) }
+          zip.close
         end
       end
 
-      # Close zip file explicitly
+      # Force close any open handles
       GC.start
-      sleep(0.1)
-      
-      # Try to move temp file to final location
-      FileHelper.safe_move(temp_path, new_docx_path)
-      
+      sleep(0.2)
+
+      # Now safely move the file to its final destination
+      if File.exist?(new_docx_path)
+        File.delete(new_docx_path) rescue nil
+      end
+
+      # Use FileUtils.mv instead of File.rename
+      FileUtils.mv(working_temp_path, new_docx_path)
+
     rescue => e
       puts "Error during file processing: #{e.message}"
-      File.unlink(temp_path) rescue nil
+      File.delete(working_temp_path) rescue nil
+      File.delete(temp_path) rescue nil
       raise e
     ensure
       # Cleanup
-      File.unlink(temp_path) rescue nil
+      File.delete(working_temp_path) rescue nil
+      File.delete(temp_path) rescue nil
       GC.start
     end
   end
