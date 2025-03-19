@@ -252,6 +252,32 @@ module ExcelToDocx
     array.map { |item| sorted[item[:number][/^[A-Za-z]+/]].shift }
   end
 
+  def self.safe_file_operation(temp_path, new_docx_path)
+    max_attempts = 5
+    attempts = 0
+    
+    begin
+      # Force garbage collection and close handles
+      GC.start
+      sleep(0.5)
+      
+      if File.exist?(new_docx_path)
+        File.unlink(new_docx_path) rescue nil
+      end
+      
+      # Try to move the file
+      FileUtils.mv(temp_path, new_docx_path)
+    rescue Errno::EACCES => e
+      attempts += 1
+      if attempts < max_attempts
+        sleep(1)
+        retry
+      else
+        raise e
+      end
+    end
+  end
+
   def self.generate_docx(docx_path, xlsx_path, field_values, new_file_path)
     xlsx = RubyXL::Parser.parse(xlsx_path)
     sheet = xlsx[0] # Берем первый лист
@@ -309,15 +335,13 @@ module ExcelToDocx
     data3 = move_first_to_end(data2)
     data5 = insert_empty_and_move(data3)
     new_docx_path = new_file_path + ".docx"
-    temp_path = new_file_path + "_temp.docx"
-    max_retries = 5
-    retry_delay = 1
+    temp_path = new_file_path + "_temp_#{Time.now.to_i}.docx"
 
     begin
-      # Сначала работаем с временным файлом
+      # Copy to temp file
       FileUtils.cp(docx_path, temp_path)
       
-      # Обработка временного файла
+      # Process the temp file
       Zip::File.open(temp_path) do |zip|
         zip.glob('word/{header,footer}*.xml').each do |entry|
           xml_content = entry.get_input_stream.read
@@ -416,27 +440,21 @@ module ExcelToDocx
         end
       end
 
-      # Закрываем все открытые файлы
+      # Close zip file explicitly
       GC.start
-      sleep 0.5
-
-      # Теперь безопасно перемещаем временный файл в целевой
-      if File.exist?(new_docx_path)
-        File.delete(new_docx_path)
-      end
+      sleep(0.1)
       
-      # На Windows используем rename вместо move
-      File.rename(temp_path, new_docx_path)
-
+      # Try to move temp file to final location
+      safe_file_operation(temp_path, new_docx_path)
+      
     rescue => e
       puts "Error during file processing: #{e.message}"
-      File.delete(temp_path) if File.exist?(temp_path)
+      File.unlink(temp_path) rescue nil
       raise e
     ensure
-      # Очистка
+      # Cleanup
+      File.unlink(temp_path) rescue nil
       GC.start
-      sleep 0.1
-      File.delete(temp_path) if File.exist?(temp_path)
     end
   end
       
