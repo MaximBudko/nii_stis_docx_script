@@ -312,28 +312,39 @@ module ExcelToDocx
     max_retries = 5
     retry_delay = 1  # секунда
 
-    # Копирование файла с повторными попытками
+    # Проверяем и закрываем файл если он открыт
+    begin
+      if File.exist?(new_docx_path)
+        File.open(new_docx_path, 'r').close rescue nil
+        File.delete(new_docx_path) rescue nil
+      end
+    rescue => e
+      puts "Error cleaning up existing file: #{e.message}"
+    end
+
+    # Ждем освобождения файла
+    sleep 0.5
+
+    # Копирование с проверкой
     max_retries.times do |attempt|
       begin
-        # Проверяем, не занят ли файл
-        if File.exist?(new_docx_path)
-          File.delete(new_docx_path) rescue nil
-        end
-        
-        # Добавляем небольшую задержку перед копированием
-        sleep 0.1
         FileUtils.cp(docx_path, new_docx_path)
+        
+        # Проверяем, что файл скопирован и доступен
+        raise "File not created" unless File.exist?(new_docx_path)
+        File.open(new_docx_path, 'r').close
+        
         break
-      rescue Errno::EACCES => e
+      rescue => e
         if attempt == max_retries - 1
-          puts "Failed to copy file after #{max_retries} attempts: #{e.message}"
+          puts "Failed to copy file: #{e.message}"
           return
         end
         sleep retry_delay
       end
     end
 
-    # Обработка файла с повторными попытками
+    # Обработка файла
     max_retries.times do |attempt|
       begin
         Zip::File.open(new_docx_path) do |zip|
@@ -440,10 +451,13 @@ module ExcelToDocx
           return
         end
         sleep retry_delay
-      ensure
         GC.start  # Принудительный вызов сборщика мусора
       end
     end
+  ensure
+    # Освобождаем ресурсы
+    GC.start
+    sleep 0.1
   end
       
 end
