@@ -19,7 +19,8 @@ class FileChooserApp < Gtk::Window
   SETTINGS_FILE = File.expand_path('saves/settings.json', __dir__)
   FIELD_LABELS = ["Перв. примен.", "Разраб.", "Пров.", "Н. контр.", "Утв.", "Дец. номер", "Наименование устройства", "Наименование организации","Номер изменения", "Нов / Зам", "Номер извещения"]
   FIELD_LABELS_FOR_REMOVED = ["perv_primen", "razrab", "prover", "n_kontr", "utverd", "blpa", "device_name", "company_name","n_i", "n_z", "nom_iz"]
- 
+  DEFAULT_SPEC_ITER = 1
+
   def initialize
     super(Gtk::WindowType::TOPLEVEL)
     set_title("Приложение")
@@ -31,6 +32,7 @@ class FileChooserApp < Gtk::Window
     @checkbox_states = {}
     @save_file_path = ""
     @save_directory = ""
+    @spec_iter = @settings['spec_iter'] || DEFAULT_SPEC_ITER
 
     notebook = Gtk::Notebook.new
     add(notebook)
@@ -52,6 +54,39 @@ class FileChooserApp < Gtk::Window
     notebook.append_page(compressed_box, Gtk::Label.new("Compressed"))
     
   #---------------------------------------------------------
+
+  #-------------Код вкладки дополнительные настройки--------
+  additional_settings = Gtk::Box.new(:vertical, 10)
+  additional_settings.set_margin_top(10)
+  additional_settings.set_margin_bottom(10)
+  additional_settings.set_margin_start(10)
+  additional_settings.set_margin_end(10)
+  notebook.append_page(additional_settings, Gtk::Label.new("Доп. настройки"))
+
+  # Добавляем метку и текстовое поле для spec_iter
+  spec_iter_label = Gtk::Label.new("Подсчет элементов в <<Спецификации>> начинается с:")
+  additional_settings.pack_start(spec_iter_label, expand: false, fill: false, padding: 5)
+
+  spec_iter_entry = Gtk::Entry.new
+  spec_iter_entry.set_hexpand(true)
+  spec_iter_entry.set_text(@spec_iter.to_s)
+  additional_settings.pack_start(spec_iter_entry, expand: false, fill: false, padding: 5)
+
+  # Ограничиваем ввод только числами
+  spec_iter_entry.signal_connect("changed") do
+    text = spec_iter_entry.text
+    if text.empty?
+      @spec_iter = DEFAULT_SPEC_ITER
+    elsif text.match?(/^\d+$/)
+      @spec_iter = text.to_i
+    else
+      spec_iter_entry.set_text(@spec_iter.to_s)
+    end
+    @settings['spec_iter'] = @spec_iter
+    save_settings
+  end
+  #---------------------------------------------------------
+
 
     @log_textview = Gtk::TextView.new
     @log_textview.editable = false
@@ -100,26 +135,65 @@ class FileChooserApp < Gtk::Window
   @text_entries = {}
   @check_buttons = {}
 
+  # Создаем основной контейнер для двух колонок
+  columns_box = Gtk::Box.new(:horizontal, 20)
+  main_box.pack_start(columns_box, expand: true, fill: true, padding: 10)
+
+  # Создаем левую и правую колонки
+  left_column = Gtk::Box.new(:vertical, 5)
+  right_column = Gtk::Box.new(:vertical, 5)
+  
+  # Добавляем вертикальный разделитель между колонками
+  separator = Gtk::Separator.new(:vertical)
+  
+  # Упаковываем колонки и разделитель
+  columns_box.pack_start(left_column, expand: true, fill: true, padding: 10)
+  columns_box.pack_start(separator, expand: false, fill: true, padding: 0)
+  columns_box.pack_start(right_column, expand: true, fill: true, padding: 10)
+
+  # Создаем контейнер для последнего поля под колонками
+  bottom_field_box = Gtk::Box.new(:vertical, 5)
+  main_box.pack_start(bottom_field_box, expand: false, fill: true, padding: 10)
+
+  @text_entries = {}
+  @check_buttons = {}
+
+  # Вычисляем количество полей для каждой колонки
+  fields_count = FIELD_LABELS.length
+  fields_per_column = (fields_count - 1) / 2
+  last_field_index = fields_count - 1
+
   FIELD_LABELS.each_with_index do |label_text, i|
+    # Определяем, куда помещать текущее поле
+    current_container = if i == last_field_index
+      bottom_field_box  # Последнее поле идет в нижний контейнер
+    else
+      i < fields_per_column ? left_column : right_column
+    end
     
-    hbox_label = Gtk::Box.new(:horizontal, 10)
-    main_box.pack_start(hbox_label, expand: false, fill: false, padding: 0)
+    # Создаем контейнер для метки и поля
+    field_box = Gtk::Box.new(:vertical, 5)
+    current_container.pack_start(field_box, expand: false, fill: true, padding: 5)
     
+    # Метка
     label = Gtk::Label.new(label_text)
     label.set_xalign(0)
-    hbox_label.pack_start(label, expand: true, fill: true, padding: 0)
+    field_box.pack_start(label, expand: false, fill: false, padding: 0)
     
-    hbox = Gtk::Box.new(:horizontal, 10)
-    main_box.pack_start(hbox, expand: false, fill: false, padding: 0)
+    # Контейнер для чекбокса и поля ввода
+    input_box = Gtk::Box.new(:horizontal, 5)
+    field_box.pack_start(input_box, expand: true, fill: true, padding: 0)
 
+    # Чекбокс
     check_button = Gtk::CheckButton.new
     check_button.active = @settings["checkbox_#{i}"]
-    hbox.pack_start(check_button, expand: false, fill: false, padding: 0)
+    input_box.pack_start(check_button, expand: false, fill: false, padding: 0)
     
+    # Поле ввода
     entry = Gtk::Entry.new
     entry.set_hexpand(true)
     entry.set_text(@settings["checkbox_#{i}"] ? (@settings["field_#{i}"] || "") : "")
-    hbox.pack_start(entry, expand: true, fill: true, padding: 0)
+    input_box.pack_start(entry, expand: true, fill: true, padding: 0)
     
     @checkbox_states[i] = check_button.active?
     
@@ -144,23 +218,30 @@ class FileChooserApp < Gtk::Window
     
     @text_entries[label_text] = entry
     @check_buttons[label_text] = check_button
+
+    # Добавляем горизонтальный разделитель после каждого поля
+    if i != last_field_index # Не добавляем разделитель после последнего поля
+      current_container.pack_start(Gtk::Separator.new(:horizontal), expand: false, fill: true, padding: 2)
+    end
   end
-  hbox_button = Gtk::Box.new(:horizontal, 10)
-  hbox_button.homogeneous = true
+
+  # Кнопки внизу (новая реализация)
+  button_box = Gtk::ButtonBox.new(:horizontal)
+  button_box.layout_style = :spread
   
+  @convert_button_vedomost = Gtk::Button.new(label: "Ведомость")
+  @convert_button_spec = Gtk::Button.new(label: "Спецификация")
   @convert_button = Gtk::Button.new(label: "Сконвертировать")
-  hbox_button.pack_end(@convert_button, expand: true, fill: true, padding: 0)
+
+  button_box.add(@convert_button_vedomost)
+  button_box.add(@convert_button_spec)
+  button_box.add(@convert_button)
+
+  @convert_button_vedomost.signal_connect("clicked") { on_convert_clicked }
+  @convert_button_spec.signal_connect("clicked") { specifiacation_button_clicked }
   @convert_button.signal_connect("clicked") { on_convert_clicked }
 
-  @convert_button_spec = Gtk::Button.new(label: "Спецификация")
-  hbox_button.pack_end(@convert_button_spec, expand: true, fill: true, padding: 0)
-  @convert_button_spec.signal_connect("clicked") { specifiacation_button_clicked }
-
-  @convert_button_vedomost = Gtk::Button.new(label: "Ведомость")
-  hbox_button.pack_end(@convert_button_vedomost, expand: true, fill: true, padding: 0)
-  @convert_button_vedomost.signal_connect("clicked") { on_convert_clicked }
-  
-  main_box.pack_end(hbox_button)
+  main_box.pack_end(button_box, expand: false, fill: false, padding: 10)
 
 end
 
@@ -251,7 +332,7 @@ def specifiacation_button_clicked
     @save_file_path = save_dialog.filename
     file_name = File.basename(@save_file_path)
     field_values = Hash[FIELD_LABELS_FOR_REMOVED.zip(@text_entries.values.map(&:text))]
-    input_int = 10
+    input_int = @spec_iter
     begin
       require_relative 'spec'
       path_to_converted_docx = File.expand_path('template/shablon_sp.docx', __dir__)
