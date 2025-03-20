@@ -225,23 +225,22 @@ class FileChooserApp < Gtk::Window
     end
   end
 
-  # Кнопки внизу (новая реализация)
-  button_box = Gtk::ButtonBox.new(:horizontal)
-  button_box.layout_style = :spread
+  button_box = Gtk::Box.new(:horizontal, 10)
+  button_box.homogeneous = true
   
   @convert_button_vedomost = Gtk::Button.new(label: "Ведомость")
   @convert_button_spec = Gtk::Button.new(label: "Спецификация")
-  @convert_button = Gtk::Button.new(label: "Сконвертировать")
-
-  button_box.add(@convert_button_vedomost)
-  button_box.add(@convert_button_spec)
-  button_box.add(@convert_button)
-
+  @convert_button = Gtk::Button.new(label: "Перечень")
+  
+  button_box.pack_start(@convert_button_vedomost, expand: true, fill: true, padding: 2)
+  button_box.pack_start(@convert_button_spec, expand: true, fill: true, padding: 2)
+  button_box.pack_start(@convert_button, expand: true, fill: true, padding: 2)
+  
   @convert_button_vedomost.signal_connect("clicked") { on_convert_clicked }
   @convert_button_spec.signal_connect("clicked") { specifiacation_button_clicked }
   @convert_button.signal_connect("clicked") { on_convert_clicked }
-
-  main_box.pack_end(button_box, expand: false, fill: false, padding: 10)
+  
+  main_box.pack_end(button_box, expand: true, fill: true, padding: 2)
 
 end
 
