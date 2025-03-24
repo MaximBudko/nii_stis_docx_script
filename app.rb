@@ -397,7 +397,7 @@ def on_vedomost_clicked
     file_name = File.basename(@save_file_path)
     field_values = Hash[FIELD_LABELS_FOR_REMOVED.zip(@text_entries.values.map(&:text))]
     begin
-      require_relative 'index'
+      require_relative 'vedomost'
       path_to_converted_docx = File.expand_path('template/shablon_vp.docx', __dir__)
       Vedomost.generate_docx(path_to_converted_docx, excel_path, field_values, @save_file_path)
       log_message("Файл успешно сконвертирован: #{@save_file_path}")
