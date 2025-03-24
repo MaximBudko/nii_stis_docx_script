@@ -236,7 +236,7 @@ class FileChooserApp < Gtk::Window
   button_box.pack_start(@convert_button_spec, expand: true, fill: true, padding: 2)
   button_box.pack_start(@convert_button, expand: true, fill: true, padding: 2)
   
-  @convert_button_vedomost.signal_connect("clicked") { on_convert_clicked }
+  @convert_button_vedomost.signal_connect("clicked") { on_vedomost_clicked }
   @convert_button_spec.signal_connect("clicked") { specifiacation_button_clicked }
   @convert_button.signal_connect("clicked") { on_convert_clicked }
   
@@ -374,8 +374,42 @@ def compressed_bom_button_clicked
   end
   save_dialog.destroy
 end
-
 #-------------------------------------------------------------
+
+#----------------------Vedomst вызов функций -----------------
+def on_vedomost_clicked
+  excel_path = @entry.text
+  if excel_path.empty?
+    log_message("Ошибка: Файл не выбран!")
+    return
+  end
+
+  save_dialog = Gtk::FileChooserDialog.new(
+    title: "Сохранить файл",
+    parent: self,
+    action: Gtk::FileChooserAction::SAVE,
+    buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Сохранить", Gtk::ResponseType::OK]]
+  )
+  save_dialog.set_do_overwrite_confirmation(true)
+
+  if save_dialog.run == Gtk::ResponseType::OK
+    @save_file_path = save_dialog.filename
+    file_name = File.basename(@save_file_path)
+    field_values = Hash[FIELD_LABELS_FOR_REMOVED.zip(@text_entries.values.map(&:text))]
+    begin
+      require_relative 'index'
+      path_to_converted_docx = File.expand_path('template/shablon_pr.docx', __dir__)
+      Vedomost.generate_docx(path_to_converted_docx, excel_path, field_values, @save_file_path)
+      log_message("Файл успешно сконвертирован: #{@save_file_path}")
+    rescue StandardError => e
+      log_message("Ошибка конвертации: #{e.message}")
+    end
+  end
+  save_dialog.destroy
+end
+#-------------------------------------------------------------
+
+
 def load_settings
   return {} unless File.exist?(SETTINGS_FILE)
   JSON.parse(File.read(SETTINGS_FILE))
