@@ -286,7 +286,7 @@ module Spec
           doc = Nokogiri::XML(xml_content)
           tables = doc.xpath("//w:tbl", "w" => "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
 
-          table = tables[1]
+          table = tables[0]
             
               start_time = Time.now
               while Time.now - start_time < 5
