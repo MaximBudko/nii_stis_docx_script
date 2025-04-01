@@ -155,30 +155,30 @@ module Spec
     current_line = []
     current_length = 0
 
-    numbers.each do |num|
+    numbers.each_with_index do |num, index|
       if (current_length + num.length + 2) <= max_length
         current_line << num
         current_length = current_line.join(", ").length
       else
-        result << current_line.join(", ") + ","
+        # Добавляем запятую только если это не последняя строка
+        result << current_line.join(", ") + (index < numbers.length - 1 ? "," : "")
         current_line = [num]
         current_length = num.length
       end
     end
 
+    # Добавляем последнюю строку без запятой
     result << current_line.join(", ") unless current_line.empty?
 
     # Форматируем результат
     first_row = row.clone
     first_row[6] = result.first
-    
+
     additional_rows = result[1..-1].map do |numbers|
       ["", "", "", "", "", "", numbers]
     end
 
-    # Удаляем запятую у последнего элемента
-    additional_rows[-1][6].chomp!(",") if additional_rows.any?
-
+    # Добавляем пустую строку только после полного блока
     [first_row] + additional_rows + [["", "", "", "", "", "", ""]]
   end
 
@@ -228,6 +228,36 @@ module Spec
       iter += 1
     end
 
+    fix_comma_arrays(result)
+  end
+
+  def self.fix_comma_arrays(array)
+    result = []
+    i = 0
+    
+    while i < array.length
+      current_row = array[i]
+      
+      # Проверяем, является ли текущая строка строкой с запятой
+      if current_row[6] == ","
+        # Получаем следующую строку, если она существует
+        next_row = array[i + 1]
+        
+        if next_row
+          # Перемещаем значения из текущей строки в следующую
+          next_row[2] = current_row[2] if current_row[2] != ""    # Номер позиции
+          next_row[4] = current_row[4] if current_row[4] != ""    # Парт номер
+          next_row[5] = current_row[5] if current_row[5] != ""    # Количество
+          
+          # Пропускаем текущую строку (с запятой)
+          i += 1
+        end
+      else
+        result << current_row
+      end
+      i += 1
+    end
+    
     result
   end
 
