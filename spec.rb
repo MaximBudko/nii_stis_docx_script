@@ -149,7 +149,7 @@ module Spec
     "#{sequence.first}-#{sequence.last}"
   end
 
-  def self.split_long_numbers(row, max_length = 10)
+  def self.split_long_numbers(row, max_length = 11)
     numbers = row[6].split(/,\s*/)
     result = []
     current_line = []
@@ -363,12 +363,30 @@ module Spec
 
                 paragraph = Nokogiri::XML::Node.new("w:p", doc)
                 paragraph_properties = Nokogiri::XML::Node.new("w:pPr", doc)
+                no_wrap = Nokogiri::XML::Node.new("w:noWrap", doc)
+                paragraph_properties.add_child(no_wrap)
                 paragraph.add_child(paragraph_properties)
                 run = Nokogiri::XML::Node.new("w:r", doc)
                 text_node = Nokogiri::XML::Node.new("w:t", doc)
                 text_node.content = value
 
                 run_properties = Nokogiri::XML::Node.new("w:rPr", doc)
+
+                if index == 2
+                  if value.to_s.length >= 3  # Проверяем длину текста
+                    spacing = Nokogiri::XML::Node.new("w:spacing", doc)
+                    spacing['w:val'] = "-10"  # Значение уплотнения
+                    run_properties.add_child(spacing)
+                  end
+                elsif index == 6
+                  if value.to_s.length >= 8  # Проверяем длину текста
+                    spacing = Nokogiri::XML::Node.new("w:spacing", doc)
+                    spacing['w:val'] = "-10"  # Значение уплотнения
+                    run_properties.add_child(spacing)
+                  end
+                end
+
+              
                 font = Nokogiri::XML::Node.new("w:rFonts", doc)
                 font['w:ascii'] = "GOST Type A"
                 font['w:hAnsi'] = "GOST Type A"
