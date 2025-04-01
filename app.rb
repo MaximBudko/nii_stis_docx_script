@@ -20,6 +20,7 @@ class FileChooserApp < Gtk::Window
   FIELD_LABELS = ["Перв. примен.", "Разраб.", "Пров.", "Н. контр.", "Утв.", "Дец. номер", "Наименование устройства", "Наименование организации","Номер изменения", "Нов / Зам", "Номер извещения"]
   FIELD_LABELS_FOR_REMOVED = ["perv_primen", "razrab", "prover", "n_kontr", "utverd", "blpa", "device_name", "company_name","n_i", "n_z", "nom_iz"]
   DEFAULT_SPEC_ITER = 1
+  DEFAULT_SPEC_ITER2 = 30
 
   def initialize
     super(Gtk::WindowType::TOPLEVEL)
@@ -33,6 +34,7 @@ class FileChooserApp < Gtk::Window
     @save_file_path = ""
     @save_directory = ""
     @spec_iter = @settings['spec_iter'] || DEFAULT_SPEC_ITER
+    @spec_iter2 = @settings['spec_iter2'] || DEFAULT_SPEC_ITER2
 
     notebook = Gtk::Notebook.new
     add(notebook)
@@ -83,6 +85,29 @@ class FileChooserApp < Gtk::Window
       spec_iter_entry.set_text(@spec_iter.to_s)
     end
     @settings['spec_iter'] = @spec_iter
+    save_settings
+  end
+  #---------------------------------------------------------
+  #-----------------------Вторая настройка------------------
+  spec_iter_label2 = Gtk::Label.new("Ограничения длинны наименования в <<Спецификации>> с:")
+  additional_settings.pack_start(spec_iter_label2, expand: false, fill: false, padding: 5)
+
+  spec_iter_entry2 = Gtk::Entry.new
+  spec_iter_entry2.set_hexpand(true)
+  spec_iter_entry2.set_text(@spec_iter2.to_s)
+  additional_settings.pack_start(spec_iter_entry2, expand: false, fill: false, padding: 5)
+
+  # Ограничиваем ввод только числами
+  spec_iter_entry2.signal_connect("changed") do
+    text = spec_iter_entry2.text
+    if text.empty?
+      @spec_iter2 = DEFAULT_SPEC_ITER2
+    elsif text.match?(/^\d+$/)
+      @spec_iter2 = text.to_i
+    else
+      spec_iter_entry2.set_text(@spec_iter2.to_s)
+    end
+    @settings['spec_iter2'] = @spec_iter2
     save_settings
   end
   #---------------------------------------------------------
@@ -332,10 +357,11 @@ def specifiacation_button_clicked
     file_name = File.basename(@save_file_path)
     field_values = Hash[FIELD_LABELS_FOR_REMOVED.zip(@text_entries.values.map(&:text))]
     input_int = @spec_iter
+    inupt_del = @spec_iter2
     begin
       require_relative 'spec'
       path_to_converted_docx = File.expand_path('template/shablon_sp.docx', __dir__)
-      Spec.generate_spec(path_to_converted_docx, excel_path, field_values, @save_file_path, input_int)
+      Spec.generate_spec(path_to_converted_docx, excel_path, field_values, @save_file_path, input_int, inupt_del)
       log_message("Файл успешно сконвертирован: #{@save_file_path}")
     rescue StandardError => e
       log_message("Ошибка конвертации: #{e.message}")

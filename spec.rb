@@ -269,6 +269,53 @@ module Spec
     result
   end
 
+  def self.split_long_text(array, max_length = 20)
+    result = []
+    
+    array.each do |row|
+      if row[4].to_s.length > max_length
+        # Разбиваем текст на слова
+        words = row[4].split(' ')
+        current_line = []
+        current_length = 0
+        
+        first_part = true
+        temp_row = row.clone
+        
+        words.each do |word|
+          if (current_length + word.length + 1) <= max_length
+            current_line << word
+            current_length = current_line.join(' ').length
+          else
+            if first_part
+              temp_row[4] = current_line.join(' ')
+              result << temp_row
+              first_part = false
+            else
+              result << ["", "", "", "", current_line.join(' '), "", ""]
+            end
+            current_line = [word]
+            current_length = word.length
+          end
+        end
+        
+        # Добавляем последнюю строку
+        if current_line.any?
+          if first_part
+            temp_row[4] = current_line.join(' ')
+            result << temp_row
+          else
+            result << ["", "", "", "", current_line.join(' '), "", ""]
+          end
+        end
+      else
+        result << row
+      end
+    end
+    
+    result
+  end
+
   private
 
   def self.sort_group_by_part_number(group)
@@ -279,11 +326,13 @@ module Spec
     end.to_h
   end
 
-  def self.generate_spec(docx_path, xlsx_path, field_values, new_file_path, input_int)
+    
+  def self.generate_spec(docx_path, xlsx_path, field_values, new_file_path, input_int, inupt_del)
     xlsx = get_excel_data(xlsx_path)
     values = field_values
-
-    data5 = format_to_array(xlsx, input_int)
+    
+    data4 = format_to_array(xlsx, input_int)
+    data5 = split_long_text(data4, inupt_del)
 
     new_docx_path = new_file_path + ".docx"
 
