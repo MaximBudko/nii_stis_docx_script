@@ -75,13 +75,13 @@ module Vedomost
             category_name = CATEGORY_MAP[key][group.size == 1 ? 0 : 1]
             
             # Добавляем название группы перед массивом группы
-            grouped_data << ["", "", "", "", "", "", "", "", "", "", ""]
-            grouped_data << ["", category_name, "", "","", "", "", "", "", "", ""]
+            grouped_data << ["", "", "", ""]
+            grouped_data << ["", category_name, "", ""]
             grouped_data.concat(group)
         else
             # Если ключ не найден, добавляем группу без названия
-            grouped_data << ["", "", "", "", "", "", "", "", "", "", ""]
-            grouped_data << ["", "Неизвестная категория", "", "", "", "", "", "", "", "", ""]
+            grouped_data << ["", "", "", ""]
+            grouped_data << ["", "Неизвестная категория", "", ""]
             grouped_data.concat(group)
         end
         end
@@ -192,56 +192,36 @@ module Vedomost
         # Initialize result array
         result = []
         
-        # Сначала обработаем длинные строки
-        processed_data = []
-        current_row = nil
-        
-        data.each do |row|
-            if current_row && row.all? { |cell| cell.to_s.empty? } && row[10].to_s.strip.length > 0
-                # Это продолжение длинного названия
-                current_row[10] = "#{current_row[10]} #{row[10]}"
-            else
-                processed_data << row
-                current_row = row
-            end
-        end
-        
-        # Group data by prefix
-        groups = processed_data.group_by do |row|
+        # Group data by prefix (first letters of position designation)
+        groups = data.group_by do |row|
             next nil if row[0].nil? || row[0].empty?
             match = row[0].to_s.match(/^[A-Za-z]+/)
-            match ? match[0] : 'UNKNOWN'
+            match ? match[0] : nil
         end
         
-        # Remove empty group if exists
+        # Remove nil group if exists
         groups.delete(nil)
         
-        # Sort groups
-        sorted_groups = groups.sort_by do |prefix, _|
-            if CATEGORY_MAP[prefix]
-                [0, CATEGORY_MAP[prefix].first]
-            else
-                [1, prefix]
-            end
-        end
+        # Sort groups by CATEGORY_MAP order
+        sorted_groups = groups.sort_by { |prefix, _| CATEGORY_MAP[prefix]&.first || "ZZZ" }
         
         # Process each group
         sorted_groups.each do |prefix, items|
-            # Add separator
+            next unless CATEGORY_MAP.key?(prefix)
+            
+            # Add separator - use the same size as data rows
             result << Array.new(items.first.size, "")
             
-            # Add group header
+            # Add group header with proper singular/plural form
+            category_name = CATEGORY_MAP[prefix][items.size == 1 ? 0 : 1]
             header_row = Array.new(items.first.size, "")
-            if CATEGORY_MAP.key?(prefix)
-                category_name = CATEGORY_MAP[prefix][items.size == 1 ? 0 : 1]
-            else
-                category_name = "Неизвестная категория"
-            end
             header_row[1] = category_name
             result << header_row
             
             # Add all items in the group
-            items.each { |item| result << item }
+            items.each do |item|
+                result << item
+            end
         end
         
         result
@@ -252,10 +232,9 @@ module Vedomost
         excel_data = get_excel_data(xlsx_path)
         process_data = process_data(excel_data)
         modified_data = modify_data(process_data)
-        grouped_data = group_data(modified_data)
-        splitted_data = split_long_strings(grouped_data)
-        
-        data5 = add_iterators(splitted_data)
+        splitted_data = split_long_strings(modified_data)
+        grouped_data = group_data(splitted_data)
+        data5 = add_iterators(grouped_data)
 
         new_docx_path = new_file_path + ".docx"
         
