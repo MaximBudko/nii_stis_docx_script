@@ -4,7 +4,6 @@ require 'nokogiri'
 require 'fileutils'
 require 'pp'
 require 'stringio'
-require 'tty-spinner'
 
 
 module Vedomost
@@ -92,7 +91,7 @@ module Vedomost
 
     def self.modify_data(data)
         # Удаляем первые три массива
-        data.shift(3)
+        data.shift(1)
     
         modified_data = []
     
@@ -299,17 +298,11 @@ module Vedomost
             doc = Nokogiri::XML(xml_content)
             tables = doc.xpath("//w:tbl", "w" => "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
             
-            table = tables[0]
-                
-                    spinner = TTY::Spinner.new("[:spinner] Действие выполняется...", format: :dots)
-                    spinner.auto_spin # Запуск анимации
-                    
+            table = tables[0]                  
                     start_time = Time.now
                     while Time.now - start_time < 5
-                        sleep 0.1 # Имитация работы, можно адаптировать
+                        puts "Работаю :D" # Имитация работы, можно адаптировать
                     end
-                    
-                    spinner.success("(Готово!)")
 
                     
                 data5.each do |row_data|

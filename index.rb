@@ -4,7 +4,6 @@ require 'nokogiri'
 require 'fileutils'
 require 'pp'
 require 'stringio'
-require 'tty-spinner'
 
 module ExcelToDocx
   # Словарь замен единиц измерения
@@ -351,15 +350,11 @@ module ExcelToDocx
           tables = doc.xpath("//w:tbl", "w" => "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
 
           tables.each do |table|
-              spinner = TTY::Spinner.new("[:spinner] Действие выполняется...", format: :dots)
-              spinner.auto_spin # Запуск анимации
-              
               start_time = Time.now
               while Time.now - start_time < 5
-                  sleep 0.1 # Имитация работы, можно адаптировать
+                puts "Работаю :D" # Имитация работы, можно адаптировать
               end
-              
-              spinner.success("(Готово!)")
+            
             data5.each do |row_data|
                 
               new_row = Nokogiri::XML::Node.new("w:tr", doc)

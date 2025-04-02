@@ -13,7 +13,6 @@ require 'nokogiri'
 require 'fileutils'
 require 'pp'
 require 'stringio'
-require 'tty-spinner'
 
 
 class FileChooserApp < Gtk::Window
