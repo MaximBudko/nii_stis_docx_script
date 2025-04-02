@@ -4,6 +4,7 @@ require 'nokogiri'
 require 'fileutils'
 require 'pp'
 require 'stringio'
+require 'tty-spinner'
 
 
 module Vedomost
@@ -300,11 +301,17 @@ module Vedomost
             
             table = tables[0]
                 
-                start_time = Time.now
-                while Time.now - start_time < 5
-                    # Ваше действие здесь
-                    puts "Действие выполняется..."# Для имитации длительного выполнения действия, можно адаптировать под нужды
-                end
+                    spinner = TTY::Spinner.new("[:spinner] Действие выполняется...", format: :dots)
+                    spinner.auto_spin # Запуск анимации
+                    
+                    start_time = Time.now
+                    while Time.now - start_time < 5
+                        sleep 0.1 # Имитация работы, можно адаптировать
+                    end
+                    
+                    spinner.success("(Готово!)")
+
+                    
                 data5.each do |row_data|
                     
                 new_row = Nokogiri::XML::Node.new("w:tr", doc)
@@ -343,6 +350,14 @@ module Vedomost
                     text_node.content = value
 
                     run_properties = Nokogiri::XML::Node.new("w:rPr", doc)
+                    if index == 2
+                        if value.to_s.length >= 10  # Проверяем длину текста
+                          spacing = Nokogiri::XML::Node.new("w:spacing", doc)
+                          spacing['w:val'] = "-10"  # Значение уплотнения
+                          run_properties.add_child(spacing)
+                        end
+                    end
+                        
                     font = Nokogiri::XML::Node.new("w:rFonts", doc)
                     font['w:ascii'] = "GOST Type A"
                     font['w:hAnsi'] = "GOST Type A"

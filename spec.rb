@@ -4,6 +4,7 @@ require 'nokogiri'
 require 'fileutils'
 require 'pp'
 require 'stringio'
+require 'tty-spinner'
 
 
 module Spec
@@ -375,11 +376,15 @@ module Spec
 
           table = tables[0]
             
+              spinner = TTY::Spinner.new("[:spinner] Действие выполняется...", format: :dots)
+              spinner.auto_spin # Запуск анимации
+              
               start_time = Time.now
               while Time.now - start_time < 5
-                # Ваше действие здесь
-                puts "Действие выполняется..."# Для имитации длительного выполнения действия, можно адаптировать под нужды
+                  sleep 0.1 # Имитация работы, можно адаптировать
               end
+              
+              spinner.success("(Готово!)") # Остановка анимации
             data5.each do |row_data|
                 
               new_row = Nokogiri::XML::Node.new("w:tr", doc)

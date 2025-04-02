@@ -15,3 +15,4 @@ gem "pp"
 gem 'stringio'
 gem 'nokogiri'
 gem 'write_xlsx'
+gem 'tty-spinner'
