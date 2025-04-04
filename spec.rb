@@ -4,38 +4,19 @@ require 'nokogiri'
 require 'fileutils'
 require 'pp'
 require 'stringio'
+require_relative 'utils/category_manager'
 
 
 module Spec
-  CATEGORY_MAP = {
-      "C" => 	["Конденсатор", "Конденсаторы"],
-      "D" => 	["Микросхема", "Микросхемы"],
-      "DA" => ["Микросхема аналоговая",	"Микросхемы аналоговые"],
-      "E" =>	["Элемент", "Элементы"],
-      "F" =>	["Предохранитель", "Предохранители"],
-      "G" => 	["Генератор", "Генераторы"],
-      "GB" =>	["Батарея литиевая", "Батареи литиевые"],
-      "H" =>	["Индикатор", "Индикаторы"],
-      "X" => 	["Соединитель", "Соединители"],
-      "K" =>	["Реле", "Реле"],
-      "L" => 	["Дроссель", "Дроссели"],
-      "R" => 	["Резистор", "Резисторы"],
-      "S" =>	["Кнопка тактовая", "Кнопки тактовые"],
-      "T" => 	["Трансформатор", "Трансформаторы"],
-      "U" => 	["Модуль", "Модули"],
-      "VD" =>	["Диод", "Диоды"],
-      "VT" =>	["Транзистор", "Транзисторы"],
-      "P" =>	["Реле", "Реле"],
-      "FA" =>	["Предохранитель", "Предохранители"],
-      "Z" =>	["Кварцевый резонатор", "Кварцевые резонаторы"]
-  }
-
   ALIAS = {
       "J" => "X",
       "HL" => "H",
       "SB" => "S"
   }
 
+  def self.get_categories
+    CategoryManager.load_categories
+  end
 
   def self.sort_by_groups(array)
       grouped = array.group_by { |item| item[:number][/^[A-Za-z]+/] }
@@ -183,6 +164,8 @@ module Spec
   end
 
   def self.format_to_array(hash, start_iter = 1)
+    categories = get_categories
+
     result = []
     current_prefix = nil
     current_manufacturer = nil
@@ -209,14 +192,14 @@ module Spec
       if quantity > 1
         # Множественные элементы
         if is_first_item
-          result << ["", "", "", "", "#{CATEGORY_MAP[prefix]&.[](1)} #{manufactured}", "", ""]
+          result << ["", "", "", "", "#{categories[prefix]&.[](1)} #{manufactured}", "", ""]
         end
         base_row = ["", "", iter.to_s, "", part_number, quantity.to_s, formatted_numbers]
         result.concat(split_long_numbers(base_row))
       else
         # Одиночные элементы
         if is_first_item
-          result << ["", "", iter.to_s, "", "#{CATEGORY_MAP[prefix]&.[](0)} #{part_number}", quantity.to_s, formatted_numbers]
+          result << ["", "", iter.to_s, "", "#{categories[prefix]&.[](0)} #{part_number}", quantity.to_s, formatted_numbers]
           result << ["", "", "", "", manufactured, "", ""]
         else
           result << ["", "", iter.to_s, "", part_number, quantity.to_s, formatted_numbers]
@@ -325,7 +308,6 @@ module Spec
       first_char =~ /\d/ ? "z#{part_number}" : part_number
     end.to_h
   end
-
     
   def self.generate_spec(docx_path, xlsx_path, field_values, new_file_path, input_int, inupt_del)
     xlsx = get_excel_data(xlsx_path)

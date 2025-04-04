@@ -13,6 +13,7 @@ require 'nokogiri'
 require 'fileutils'
 require 'pp'
 require 'stringio'
+require_relative 'utils/category_manager'
 
 
 class FileChooserApp < Gtk::Window
@@ -110,9 +111,162 @@ class FileChooserApp < Gtk::Window
     @settings['spec_iter2'] = @spec_iter2
     save_settings
   end
+#---------------------------------------------------------
+
+#-----------------------Код редактирования словарей-------
+  # Добавляем разделитель
+  category_separator = Gtk::Separator.new(:horizontal)
+  additional_settings.pack_start(category_separator, expand: false, fill: true, padding: 10)
+
+  # Заголовок секции категорий
+  category_label = Gtk::Label.new("Настройки категорий компонентов")
+  category_label.set_xalign(0)
+  additional_settings.pack_start(category_label, expand: false, fill: false, padding: 5)
+
+  # Создаем поля для ввода новой категории
+  input_grid = Gtk::Grid.new
+  input_grid.set_column_spacing(5)
+  input_grid.set_row_spacing(5)
+  additional_settings.pack_start(input_grid, expand: false, fill: true, padding: 5)
+
+  # Поле для ключа категории
+  key_label = Gtk::Label.new("Ключ:")
+  key_entry = Gtk::Entry.new
+  key_entry.set_width_chars(10)
+  input_grid.attach(key_label, 0, 0, 1, 1)
+  input_grid.attach(key_entry, 1, 0, 1, 1)
+
+  # Поле для единственного числа
+  singular_label = Gtk::Label.new("Ед. число:")
+  singular_entry = Gtk::Entry.new
+  singular_entry.set_width_chars(20)
+  input_grid.attach(singular_label, 2, 0, 1, 1)
+  input_grid.attach(singular_entry, 3, 0, 1, 1)
+
+  # Поле для множественного числа
+  plural_label = Gtk::Label.new("Мн. число:")
+  plural_entry = Gtk::Entry.new
+  plural_entry.set_width_chars(20)
+  input_grid.attach(plural_label, 4, 0, 1, 1)
+  input_grid.attach(plural_entry, 5, 0, 1, 1)
+
+
+
+  # Создаем список категорий
+  scrolled_window = Gtk::ScrolledWindow.new
+  scrolled_window.set_policy(:automatic, :automatic)
+  scrolled_window.set_size_request(-1, 200)
+  additional_settings.pack_start(scrolled_window, expand: true, fill: true, padding: 5)
+
+  category_store = Gtk::ListStore.new(String, String, String)
+  category_view = Gtk::TreeView.new(category_store)
+
+  # Добавляем колонки
+  renderer = Gtk::CellRendererText.new
+  column1 = Gtk::TreeViewColumn.new("Ключ", renderer, text: 0)
+  column2 = Gtk::TreeViewColumn.new("Ед. число", renderer, text: 1)
+  column3 = Gtk::TreeViewColumn.new("Мн. число", renderer, text: 2)
+
+  category_view.append_column(column1)
+  category_view.append_column(column2)
+  category_view.append_column(column3)
+
+  scrolled_window.add(category_view)
+  # Кнопки управления
+  button_box = Gtk::Box.new(:horizontal, 5)
+  additional_settings.pack_start(button_box, expand: false, fill: true, padding: 5)
+  
+  add_button = Gtk::Button.new(label: "Добавить")
+  update_button = Gtk::Button.new(label: "Обновить")
+  delete_button = Gtk::Button.new(label: "Удалить")
+  
+  button_box.pack_start(add_button, expand: true, fill: true, padding: 2)
+  button_box.pack_start(update_button, expand: true, fill: true, padding: 2)
+  button_box.pack_start(delete_button, expand: true, fill: true, padding: 2)
+  
+  # Инициализируем список категорий
+  update_category_list(category_store)
+  
+  # Настраиваем обработчики событий кнопок
+  setup_category_buttons(add_button, update_button, delete_button, key_entry, singular_entry, plural_entry, category_store)
+  
+  # Настраиваем выбор категории из списка
+  category_view.signal_connect("cursor-changed") do
+    selection = category_view.selection
+    if iter = selection.selected
+      key_entry.text = iter[0]
+      singular_entry.text = iter[1]
+      plural_entry.text = iter[2]
+    end
+  end
+
+  update_category_list(category_store)
+
+  # Обработчики событий
+  add_button.signal_connect("clicked") do
+    key = key_entry.text.strip
+    singular = singular_entry.text.strip
+    plural = plural_entry.text.strip
+
+    if key.empty? || singular.empty? || plural.empty?
+      log_message("Ошибка: Все поля должны быть заполнены")
+    else
+      if CategoryManager.add_category(key, singular, plural)
+        update_category_list(category_store)
+        log_message("Категория успешно добавлена")
+        key_entry.text = ""
+        singular_entry.text = ""
+        plural_entry.text = ""
+      else
+        log_message("Ошибка: Категория с таким ключом уже существует")
+      end
+    end
+  end
+
+  update_button.signal_connect("clicked") do
+    key = key_entry.text.strip
+    singular = singular_entry.text.strip
+    plural = plural_entry.text.strip
+
+    if key.empty? || singular.empty? || plural.empty?
+      log_message("Ошибка: Все поля должны быть заполнены")
+    else
+      if CategoryManager.update_category(key, singular, plural)
+        update_category_list(category_store)
+        log_message("Категория успешно обновлена")
+      else
+        log_message("Ошибка: Категория не найдена")
+      end
+    end
+  end
+
+  delete_button.signal_connect("clicked") do
+    key = key_entry.text.strip
+    if key.empty?
+      log_message("Ошибка: Введите ключ категории для удаления")
+    else
+      if CategoryManager.remove_category(key)
+        update_category_list(category_store)
+        log_message("Категория успешно удалена")
+        key_entry.text = ""
+        singular_entry.text = ""
+        plural_entry.text = ""
+      else
+        log_message("Ошибка: Категория не найдена")
+      end
+    end
+  end
+
+  # Выбор категории из списка
+  category_view.signal_connect("cursor-changed") do
+    selection = category_view.selection
+    if iter = selection.selected
+      key_entry.text = iter[0]
+      singular_entry.text = iter[1]
+      plural_entry.text = iter[2]
+    end
+  end
   #---------------------------------------------------------
-
-
     @log_textview = Gtk::TextView.new
     @log_textview.editable = false
     @log_buffer = @log_textview.buffer
@@ -372,80 +526,153 @@ end
 #--------------------------------------------------------------
 #-----------------------Compressed BOM вызов функции----------
 
-def compressed_bom_button_clicked
-  excel_path = @entry_compressed.text
-  if excel_path.empty?
-    log_message("Ошибка: Файл не выбран!")
-    return
-  end
-
-  save_dialog = Gtk::FileChooserDialog.new(
-    title: "Сохранить файл",
-    parent: self,
-    action: Gtk::FileChooserAction::SAVE,
-    buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Сохранить", Gtk::ResponseType::OK]]
-  )
-  save_dialog.set_do_overwrite_confirmation(true)
-
-  if save_dialog.run == Gtk::ResponseType::OK
-    @save_file_path = save_dialog.filename
-    file_name = File.basename(@save_file_path)
-    begin
-      require_relative 'compressed_bom'
-      CompressedBom.process_excel(excel_path, "#{@save_file_path}.xlsx")
-      log_message("Файл успешно сконвертирован: #{@save_file_path}")
-    rescue StandardError => e
-      log_message("Ошибка конвертации: #{e.message}")
+  def compressed_bom_button_clicked
+    excel_path = @entry_compressed.text
+    if excel_path.empty?
+      log_message("Ошибка: Файл не выбран!")
+      return
     end
+
+    save_dialog = Gtk::FileChooserDialog.new(
+      title: "Сохранить файл",
+      parent: self,
+      action: Gtk::FileChooserAction::SAVE,
+      buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Сохранить", Gtk::ResponseType::OK]]
+    )
+    save_dialog.set_do_overwrite_confirmation(true)
+
+    if save_dialog.run == Gtk::ResponseType::OK
+      @save_file_path = save_dialog.filename
+      file_name = File.basename(@save_file_path)
+      begin
+        require_relative 'compressed_bom'
+        CompressedBom.process_excel(excel_path, "#{@save_file_path}.xlsx")
+        log_message("Файл успешно сконвертирован: #{@save_file_path}")
+      rescue StandardError => e
+        log_message("Ошибка конвертации: #{e.message}")
+      end
+    end
+    save_dialog.destroy
   end
-  save_dialog.destroy
-end
+  #-------------------------------------------------------------
+
+  #----------------------Vedomst вызов функций -----------------
+  def on_vedomost_clicked
+    excel_path = @entry.text
+    if excel_path.empty?
+      log_message("Ошибка: Файл не выбран!")
+      return
+    end
+
+    save_dialog = Gtk::FileChooserDialog.new(
+      title: "Сохранить файл",
+      parent: self,
+      action: Gtk::FileChooserAction::SAVE,
+      buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Сохранить", Gtk::ResponseType::OK]]
+    )
+    save_dialog.set_do_overwrite_confirmation(true)
+
+    if save_dialog.run == Gtk::ResponseType::OK
+      @save_file_path = save_dialog.filename
+      file_name = File.basename(@save_file_path)
+      field_values = Hash[FIELD_LABELS_FOR_REMOVED.zip(@text_entries.values.map(&:text))]
+      begin
+        require_relative 'vedomost'
+        path_to_converted_docx = File.expand_path('template/shablon_vp.docx', __dir__)
+        Vedomost.generate_docx(path_to_converted_docx, excel_path, field_values, @save_file_path)
+        log_message("Файл успешно сконвертирован: #{@save_file_path}")
+      rescue StandardError => e
+        log_message("Ошибка конвертации: #{e.message}")
+      end
+    end
+    save_dialog.destroy
+  end
 #-------------------------------------------------------------
 
-#----------------------Vedomst вызов функций -----------------
-def on_vedomost_clicked
-  excel_path = @entry.text
-  if excel_path.empty?
-    log_message("Ошибка: Файл не выбран!")
-    return
+
+  def load_settings
+    return {} unless File.exist?(SETTINGS_FILE)
+    JSON.parse(File.read(SETTINGS_FILE))
+  rescue
+    {}
   end
 
-  save_dialog = Gtk::FileChooserDialog.new(
-    title: "Сохранить файл",
-    parent: self,
-    action: Gtk::FileChooserAction::SAVE,
-    buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Сохранить", Gtk::ResponseType::OK]]
-  )
-  save_dialog.set_do_overwrite_confirmation(true)
+  def save_settings
+    File.write(SETTINGS_FILE, JSON.pretty_generate(@settings))
+  end
 
-  if save_dialog.run == Gtk::ResponseType::OK
-    @save_file_path = save_dialog.filename
-    file_name = File.basename(@save_file_path)
-    field_values = Hash[FIELD_LABELS_FOR_REMOVED.zip(@text_entries.values.map(&:text))]
-    begin
-      require_relative 'vedomost'
-      path_to_converted_docx = File.expand_path('template/shablon_vp.docx', __dir__)
-      Vedomost.generate_docx(path_to_converted_docx, excel_path, field_values, @save_file_path)
-      log_message("Файл успешно сконвертирован: #{@save_file_path}")
-    rescue StandardError => e
-      log_message("Ошибка конвертации: #{e.message}")
+  private
+
+  def update_category_list(store)
+    store.clear
+    categories = CategoryManager.load_categories
+    categories.each do |key, values|
+      iter = store.append
+      iter[0] = key
+      iter[1] = values[0]
+      iter[2] = values[1]
     end
   end
-  save_dialog.destroy
-end
-#-------------------------------------------------------------
 
+  def add_category(key, singular, plural)
+    return false if key.empty? || singular.empty? || plural.empty?
+    CategoryManager.add_category(key, singular, plural)
+  end
 
-def load_settings
-  return {} unless File.exist?(SETTINGS_FILE)
-  JSON.parse(File.read(SETTINGS_FILE))
-rescue
-  {}
-end
+  def remove_category(key)
+    return false if key.empty?
+    CategoryManager.remove_category(key)
+  end
 
-def save_settings
-  File.write(SETTINGS_FILE, JSON.pretty_generate(@settings))
-end
+  def update_category(key, singular, plural)
+    return false if key.empty? || singular.empty? || plural.empty?
+    CategoryManager.update_category(key, singular, plural)
+  end
+
+  # Обновим обработчики событий кнопок
+  def setup_category_buttons(add_button, update_button, delete_button, key_entry, singular_entry, plural_entry, category_store)
+    add_button.signal_connect("clicked") do
+      key = key_entry.text.strip
+      singular = singular_entry.text.strip
+      plural = plural_entry.text.strip
+
+      if add_category(key, singular, plural)
+        update_category_list(category_store)
+        log_message("Категория успешно добавлена")
+        key_entry.text = ""
+        singular_entry.text = ""
+        plural_entry.text = ""
+      else
+        log_message("Ошибка: Все поля должны быть заполнены или категория уже существует")
+      end
+    end
+
+    update_button.signal_connect("clicked") do
+      key = key_entry.text.strip
+      singular = singular_entry.text.strip
+      plural = plural_entry.text.strip
+
+      if update_category(key, singular, plural)
+        update_category_list(category_store)
+        log_message("Категория успешно обновлена")
+      else
+        log_message("Ошибка: Все поля должны быть заполнены или категория не найдена")
+      end
+    end
+
+    delete_button.signal_connect("clicked") do
+      key = key_entry.text.strip
+      if remove_category(key)
+        update_category_list(category_store)
+        log_message("Категория успешно удалена")
+        key_entry.text = ""
+        singular_entry.text = ""
+        plural_entry.text = ""
+      else
+        log_message("Ошибка: Введите ключ категории для удаления")
+      end
+    end
+  end
 end
 
 if __FILE__ == $0

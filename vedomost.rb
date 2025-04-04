@@ -4,31 +4,14 @@ require 'nokogiri'
 require 'fileutils'
 require 'pp'
 require 'stringio'
+require 'json'
+require_relative 'utils/category_manager'
 
 
 module Vedomost
-    CATEGORY_MAP = {
-        "C" => 	["Конденсатор", "Конденсаторы"],
-        "D" => 	["Микросхема", "Микросхемы"],
-        "DA" => ["Микросхема аналоговая",	"Микросхемы аналоговые"],
-        "E" =>	["Элемент", "Элементы"],
-        "F" =>	["Предохранитель", "Предохранители"],
-        "G" => 	["Генератор", "Генераторы"],
-        "GB" =>	["Батарея литиевая", "Батареи литиевые"],
-        "H" =>	["Индикатор", "Индикаторы"],
-        "X" => 	["Соединитель", "Соединители"],
-        "K" =>	["Реле", "Реле"],
-        "L" => 	["Дроссель", "Дроссели"],
-        "R" => 	["Резистор", "Резисторы"],
-        "S" =>	["Кнопка тактовая", "Кнопки тактовые"],
-        "T" => 	["Трансформатор", "Трансформаторы"],
-        "U" => 	["Модуль", "Модули"],
-        "VD" =>	["Диод", "Диоды"],
-        "VT" =>	["Транзистор", "Транзисторы"],
-        "P" =>	["Реле", "Реле"],
-        "FA" =>	["Предохранитель", "Предохранители"],
-        "Z" =>	["Кварцевый резонатор", "Кварцевые резонаторы"]
-    }
+    def self.get_categories
+        CategoryManager.load_categories
+    end
 
     def self.get_excel_data(file_path)
         workbook = RubyXL::Parser.parse(file_path)
@@ -64,13 +47,12 @@ module Vedomost
 
     def self.group_data(data)
         grouped_data = []
-
+        categories = get_categories
         # Группируем данные по буквенной части нулевого индекса
         data.group_by { |row| row[0].match(/[A-Za-z]+/)[0] }.each do |key, group|
-        # Проверяем наличие ключа в CATEGORY_MAP
-        if CATEGORY_MAP.key?(key)
-            # Получаем название группы из CATEGORY_MAP
-            category_name = CATEGORY_MAP[key][group.size == 1 ? 0 : 1]
+        if categories.key?(key)
+
+            category_name = categories[key][group.size == 1 ? 0 : 1]
             
             # Добавляем название группы перед массивом группы
             grouped_data << ["", "", "", "", "", "", "", "", "", "", ""]
@@ -189,7 +171,7 @@ module Vedomost
     def self.group_data(data)
         # Initialize result array
         result = []
-        
+        categories = get_categories
         # Сначала обработаем длинные строки
         processed_data = []
         current_row = nil
@@ -216,8 +198,8 @@ module Vedomost
         
         # Sort groups
         sorted_groups = groups.sort_by do |prefix, _|
-            if CATEGORY_MAP[prefix]
-                [0, CATEGORY_MAP[prefix].first]
+            if categories[prefix]
+                [0, categories[prefix].first]
             else
                 [1, prefix]
             end
@@ -230,8 +212,8 @@ module Vedomost
             
             # Add group header
             header_row = Array.new(items.first.size, "")
-            if CATEGORY_MAP.key?(prefix)
-                category_name = CATEGORY_MAP[prefix][items.size == 1 ? 0 : 1]
+            if categories.key?(prefix)
+                category_name = categories[prefix][items.size == 1 ? 0 : 1]
             else
                 category_name = "Неизвестная категория"
             end
