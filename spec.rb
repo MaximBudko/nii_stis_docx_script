@@ -155,30 +155,30 @@ module Spec
     current_line = []
     current_length = 0
 
-    numbers.each_with_index do |num, index|
+    numbers.each do |num|
       if (current_length + num.length + 2) <= max_length
         current_line << num
         current_length = current_line.join(", ").length
       else
-        # Добавляем запятую только если это не последняя строка
-        result << current_line.join(", ") + (index < numbers.length - 1 ? "," : "")
+        result << current_line.join(", ") + ","
         current_line = [num]
         current_length = num.length
       end
     end
 
-    # Добавляем последнюю строку без запятой
     result << current_line.join(", ") unless current_line.empty?
 
     # Форматируем результат
     first_row = row.clone
     first_row[6] = result.first
-
+    
     additional_rows = result[1..-1].map do |numbers|
       ["", "", "", "", "", "", numbers]
     end
 
-    # Добавляем пустую строку только после полного блока
+    # Удаляем запятую у последнего элемента
+    additional_rows[-1][6].chomp!(",") if additional_rows.any?
+
     [first_row] + additional_rows + [["", "", "", "", "", "", ""]]
   end
 
