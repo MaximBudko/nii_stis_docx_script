@@ -374,7 +374,7 @@ module Spec
           tables = doc.xpath("//w:tbl", "w" => "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
 
           table = tables[0]
-            
+          start_time = Time.now
               while Time.now - start_time < 5
                   puts "Работаю :D" # Имитация работы, можно адаптировать
               end
