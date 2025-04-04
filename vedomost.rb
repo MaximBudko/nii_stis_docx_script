@@ -30,7 +30,6 @@ module Vedomost
         "Z" =>	["Кварцевый резонатор", "Кварцевые резонаторы"]
     }
 
-
     def self.get_excel_data(file_path)
         workbook = RubyXL::Parser.parse(file_path)
         sheet = workbook[0]
@@ -62,7 +61,6 @@ module Vedomost
     
         unique_data
     end
-
 
     def self.group_data(data)
         grouped_data = []
@@ -246,13 +244,29 @@ module Vedomost
         
         result
     end
+
+    def self.sort_within_groups(data)
+        groups = data.group_by { |row| row[0].to_s.match(/^[A-Za-z]+/)[0] }
+        
+        sorted_groups = groups.transform_values do |group_items|
+          group_items.sort_by { |item| item[1].to_s.downcase }
+        end
+        
+        result = []
+        sorted_groups.each do |prefix, items|
+          result.concat(items)
+        end
+        
+        result
+    end
     
     def self.generate_docx(docx_path, xlsx_path, field_values, new_file_path)
         values = field_values
         excel_data = get_excel_data(xlsx_path)
         process_data = process_data(excel_data)
         modified_data = modify_data(process_data)
-        grouped_data = group_data(modified_data)
+        alpha_data = sort_within_groups(modified_data)
+        grouped_data = group_data(alpha_data)
         splitted_data = split_long_strings(grouped_data)
         
         data5 = add_iterators(splitted_data)
