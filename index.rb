@@ -4,6 +4,8 @@ require 'nokogiri'
 require 'fileutils'
 require 'pp'
 require 'stringio'
+require 'json'
+require_relative "utils/ui_state"
 
 module ExcelToDocx
   # Словарь замен единиц измерения
@@ -26,6 +28,7 @@ module ExcelToDocx
     "G" => 	["Генератор", "Генераторы"],
     "GB" =>	["Батарея литиевая", "Батареи литиевые"],
     "H" =>	["Индикатор", "Индикаторы"],
+    "HL" =>	["Индикатор", "Индикаторы"],
     "X" => 	["Соединитель", "Соединители"],
     "K" =>	["Реле", "Реле"],
     "L" => 	["Дроссель", "Дроссели"],
@@ -252,6 +255,50 @@ module ExcelToDocx
     array.map { |item| sorted[item[:number][/^[A-Za-z]+/]].shift }
   end
 
+  def self.replacment_analogues(data)
+    bom_array = data
+
+    parts_json = JSON.parse(File.read("saves/analogue.json"))
+    if parts_json.empty?
+      log_message("Ошибка: Файл нет файла с аналогами!")
+      return
+    end
+
+    parts_lookup = {}
+    parts_json.each do |part|
+      pn = part["PART_NUMBER"]
+      next if pn.nil? || pn.strip.empty?
+      parts_lookup[pn] = part
+    end
+
+    bom_array.each do |bom|
+      part_number = bom[1].split.first
+
+      if parts_lookup.key?(part_number)
+        part = parts_lookup[part_number]
+
+        (0..10).each do |i|
+          if i == 0
+            name  = part["Наименование"].to_s.strip
+            manuf = part["Производитель"].to_s.strip
+            note  = part["Примечание"].to_s.strip
+          else
+            name  = part["Наименование_#{i}"].to_s.strip
+            manuf = part["Производитель_#{i}"].to_s.strip
+            note  = part["Примечание_#{i}"].to_s.strip
+          end
+
+          unless name.empty? && manuf.empty?
+            bom[1] = [name, manuf].reject(&:empty?).join(" ")
+            bom[3] = note unless note.empty?
+            break
+          end
+        end
+      end
+    end
+    return bom_array
+  end
+
   def self.generate_docx(docx_path, xlsx_path, field_values, new_file_path)
     xlsx = RubyXL::Parser.parse(xlsx_path)
     sheet = xlsx[0] # Берем первый лист
@@ -308,8 +355,13 @@ module ExcelToDocx
     data2 = process_array(data1)
     data3 = move_first_to_end(data2)
     data5 = insert_empty_and_move(data3)
+
+    if UIState.myswitch.active?
+      data5 = replacment_analogues(data5)
+    end
+
     new_docx_path = new_file_path + ".docx"
-    
+
     begin
       sleep 0.5
       FileUtils.cp(docx_path, new_docx_path)
@@ -352,7 +404,7 @@ module ExcelToDocx
           tables.each do |table|
               start_time = Time.now
               while Time.now - start_time < 5
-                puts "Работаю :D" # Имитация работы, можно адаптировать
+                puts "Работаю :D" 
               end
             
             data5.each do |row_data|

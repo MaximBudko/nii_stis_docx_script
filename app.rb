@@ -14,10 +14,12 @@ require 'fileutils'
 require 'pp'
 require 'stringio'
 require_relative 'utils/category_manager'
+require_relative 'utils/ui_state'
 
 
 class FileChooserApp < Gtk::Window
   SETTINGS_FILE = File.expand_path('saves/settings.json', __dir__)
+  ANALOGUE_JSON = File.expand_path('saves/analogue.json', __dir__)
   FIELD_LABELS = ["Перв. примен.", "Разраб.", "Пров.", "Н. контр.", "Утв.", "Дец. номер", "Наименование устройства", "Наименование организации","Номер изменения", "Нов / Зам", "Номер извещения"]
   FIELD_LABELS_FOR_REMOVED = ["perv_primen", "razrab", "prover", "n_kontr", "utverd", "blpa", "device_name", "company_name","n_i", "n_z", "nom_iz"]
   DEFAULT_SPEC_ITER = 1
@@ -47,6 +49,15 @@ class FileChooserApp < Gtk::Window
     main_box.set_margin_end(10)
     notebook.append_page(main_box, Gtk::Label.new("Главная"))
 
+  #----------------Код формы для загрузки списка отечественных аналогов--------
+    replacment_pool = Gtk::Box.new(:vertical, 10)
+    replacment_pool.set_margin_top(10)
+    replacment_pool.set_margin_bottom(10)
+    replacment_pool.set_margin_start(10)
+    replacment_pool.set_margin_end(10)
+    notebook.append_page(replacment_pool, Gtk::Label.new("Аналоги"))
+
+  #----------------------------------------------------------------------------
   #----------------Код вкладки Compressed-------------------
 
     compressed_box = Gtk::Box.new(:vertical, 10)
@@ -279,6 +290,11 @@ class FileChooserApp < Gtk::Window
     hbox_file = Gtk::Box.new(:horizontal, 10)
     main_box.pack_start(hbox_file, expand: false, fill: false, padding: 0)
 
+    switch = Gtk::Switch.new
+    switch.set_size_request(10, -1)
+    UIState.myswitch = switch
+    hbox_file.pack_start(switch, expand: false, fill: false, padding: 0)
+
     @entry = Gtk::Entry.new
     @entry.set_hexpand(true)
     @entry.set_editable(true)
@@ -289,6 +305,24 @@ class FileChooserApp < Gtk::Window
     hbox_file.pack_start(@button, expand: false, fill: false, padding: 0)
 
   #-------------------------------------------------------------------------
+  #--------------------Код выбора файла в аналогах------------------------
+    replacment_excel = Gtk::Box.new(:horizontal, 10)
+    replacment_pool.pack_start(replacment_excel, expand: false, fill:false, padding: 0)
+
+    @entry_replacment = Gtk::Entry.new
+    @entry_replacment.set_hexpand(true)
+    @entry_replacment.set_editable(true)
+    replacment_excel.pack_start(@entry_replacment, expand: true, fill: true, padding: 0)
+
+    @entry_replacment_btn = Gtk::Button.new(label: "Выбрать файл")
+    @entry_replacment_btn.signal_connect("clicked") {replacment_import_controller}
+    replacment_excel.pack_start(@entry_replacment_btn, expand: false, fill: false, padding: 0)
+  #------------------------------------------------------------------------
+  #-------------------Кнопка загрузки аналогов(формируется json(каждый раз новый))----------------
+  @import_analogue_button = Gtk::Button.new(label: "Загрузить аналоги")
+  replacment_pool.pack_start(@import_analogue_button, expand: false, fill: false, padding: 0)
+  @import_analogue_button.signal_connect("clicked") { import_analogue_button_clicked } 
+  #-----------------------------------------------------------------------------------------------
 
   #---------------Код выбора файла в Compressed-----------------------------
     set_path_file_comp = Gtk::Box.new(:horizontal, 10)
@@ -304,6 +338,7 @@ class FileChooserApp < Gtk::Window
     @button_set_compressed.signal_connect("clicked") {compresed_bom_controller}
     set_path_file_comp.pack_start(@button_set_compressed, expand: false, fill: false, padding: 0)
   #-------------------------------------------------------------------------
+
 
   #----------------Кнопка конвертации Compressed----------------------------
     @compressed_bom_button = Gtk::Button.new(label: "Compressed")
@@ -443,6 +478,22 @@ def on_file_clicked
   dialog.destroy
 end
 
+def replacment_import_controller
+  dialog_comp = Gtk::FileChooserDialog.new(
+    title: "Выберите файл",
+    parent: self,
+    action: Gtk::FileChooserAction::OPEN,
+    buttons: [["Отмена", Gtk::ResponseType::CANCEL], ["Открыть", Gtk::ResponseType::OK]]
+  )
+  if dialog_comp.run == Gtk::ResponseType::OK
+    @entry_replacment.set_text(dialog_comp.filename)
+    log_message("Файл выбран: #{dialog_comp.filename}")
+  end
+  dialog_comp.destroy
+
+end
+
+
 def compresed_bom_controller
   dialog_comp = Gtk::FileChooserDialog.new(
     title: "Выберите файл",
@@ -523,7 +574,20 @@ def specifiacation_button_clicked
   end
   save_dialog.destroy
 end
-#--------------------------------------------------------------
+#-------------------------------------------------------------
+#-----------------------Логика кнопки аналогов----------------
+def import_analogue_button_clicked
+  analogue_excel_path = @entry_replacment.text
+  json_path = 
+  if analogue_excel_path.empty?
+    log_message("Ошибка: Файл не выбран!")
+    return
+  end
+  require_relative 'utils/import_analogue_xlsx'
+  JsonAnalogue.xlsx_to_json(analogue_excel_path, ANALOGUE_JSON) #excel, json
+end
+#-------------------------------------------------------------
+
 #-----------------------Compressed BOM вызов функции----------
 
   def compressed_bom_button_clicked

@@ -38,7 +38,7 @@ module Vedomost
         processed_data.each do |row|
         row[3] = "#{count_hash[row[1]]}"
         end
-    
+        
         # Оставляем только уникальные строки
         unique_data = processed_data.uniq { |row| row[1] }
     
@@ -302,7 +302,7 @@ module Vedomost
 
                     
                 data5.each do |row_data|
-                    
+
                 new_row = Nokogiri::XML::Node.new("w:tr", doc)
                 row_properties = Nokogiri::XML::Node.new("w:trPr", doc)
                 row_height = Nokogiri::XML::Node.new("w:trHeight", doc)
