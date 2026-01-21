@@ -36,6 +36,7 @@ GEM
     json (2.10.1)
     matrix (0.4.2)
     native-package-installer (1.1.9)
+    nkf (0.2.0)
     nokogiri (1.18.3-arm64-darwin)
       racc (~> 1.4)
     pango (4.2.7)
@@ -72,6 +73,12 @@ GEM
     rubyzip (2.4.1)
     securerandom (0.4.1)
     stringio (3.1.5)
+    tty-cursor (0.7.1)
+    tty-spinner (0.9.3)
+      tty-cursor (~> 0.7)
+    write_xlsx (1.12.1)
+      nkf
+      rubyzip (>= 1.0.0)
     zip (2.0.2)
 
 PLATFORMS
@@ -89,6 +96,8 @@ DEPENDENCIES
   rubyXL
   securerandom
   stringio
+  tty-spinner
+  write_xlsx
   zip
 
 BUNDLED WITH

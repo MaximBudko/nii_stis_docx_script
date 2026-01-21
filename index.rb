@@ -45,7 +45,6 @@ module ExcelToDocx
 
   ALIAS = {
     "J" => "X",
-    "HL" => "H",
     "SB" => "S"
   }
 
